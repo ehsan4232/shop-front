@@ -1,164 +1,278 @@
-import { Button } from '@/components/ui/button'
+'use client'
+
+import { motion } from 'framer-motion'
+import Link from 'next/link'
 import { ArrowLeftIcon, CheckIcon } from '@heroicons/react/24/outline'
 
 const plans = [
   {
     name: 'رایگان',
     price: '۰',
-    description: 'برای شروع کسب‌وکار',
+    description: 'برای شروع و آزمایش',
     features: [
-      'تا ۱۰ محصول',
-      '۱ فروشگاه',
-      'پشتیبانی ایمیلی',
-      'قالب‌های پایه',
-      'SSL رایگان',
+      'تا ۵۰ محصول',
+      '۱۰۰ مگابایت فضای ذخیره‌سازی',
+      'دامنه رایگان .mall.ir',
+      'پشتیبانی ایمیل',
+      'تمهای پایه',
     ],
-    popular: false,
+    limitations: [
+      'بدون دامنه اختصاصی',
+      'محدودیت در سفارشی‌سازی',
+    ],
+    highlighted: false,
+    buttonText: 'شروع رایگان',
+    buttonColor: 'bg-gray-600 hover:bg-gray-700'
   },
   {
     name: 'حرفه‌ای',
-    price: '۴۹,۰۰۰',
-    description: 'برای کسب‌وکارهای در حال رشد',
+    price: '۲۹۹,۰۰۰',
+    originalPrice: '۴۹۹,۰۰۰',
+    description: 'برای کسب‌وکارهای جدی',
     features: [
-      'محصولات نامحدود',
-      '۳ فروشگاه',
+      'تا ۲۰۰۰ محصول',
+      '۵ گیگابایت فضای ذخیره‌سازی',
+      'دامنه اختصاصی رایگان',
+      'اتصال به شبکه‌های اجتماعی',
+      'آنالیتیکس پیشرفته',
       'پشتیبانی تلفنی',
-      'تمام قالب‌ها',
-      'آمار پیشرفته',
-      'واردات از شبکه‌های اجتماعی',
-      'درگاه‌های پرداخت',
+      'تمام تمه‌ها و قالب‌ها',
+      'سئو پیشرفته',
     ],
-    popular: true,
+    limitations: [],
+    highlighted: true,
+    buttonText: 'انتخاب پلان حرفه‌ای',
+    buttonColor: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
   },
   {
-    name: 'کسب‌وکار',
-    price: '۹۹,۰۰۰',
-    description: 'برای شرکت‌ها و کسب‌وکارهای بزرگ',
+    name: 'سازمانی',
+    price: 'تماس بگیرید',
+    description: 'برای فروشگاه‌های بزرگ',
     features: [
-      'همه چیز در پلن حرفه‌ای',
-      'فروشگاه‌های نامحدود',
-      'پشتیبانی اختصاصی',
+      'محصولات نامحدود',
+      'فضای ذخیره‌سازی نامحدود',
+      'چندین دامنه',
       'API اختصاصی',
-      'گزارش‌های تخصصی',
-      'مدیریت چند فروشنده',
-      'پشتیبان‌گیری اولویت‌دار',
+      'مدیریت چند فروشگاه',
+      'پشتیبانی اختصاصی',
+      'گزارشات تخصصی',
+      'امکانات سفارشی',
     ],
-    popular: false,
+    limitations: [],
+    highlighted: false,
+    buttonText: 'تماس با فروش',
+    buttonColor: 'bg-gray-600 hover:bg-gray-700'
+  }
+]
+
+const testimonials = [
+  {
+    name: 'علی احمدی',
+    business: 'فروشگاه مد و پوشاک آریا',
+    image: '/placeholder-avatar-1.jpg',
+    quote: 'با پلتفرم مال، فروش آنلاین‌ام ۳ برابر شد. رابط کاربری فوق‌العاده و پشتیبانی عالی!'
   },
+  {
+    name: 'مریم صادقی',
+    business: 'جواهرات نگین',
+    image: '/placeholder-avatar-2.jpg',
+    quote: 'امکان وارد کردن محصولات از اینستاگرام کاری رو خیلی راحت کرده. حرف نداره!'
+  },
+  {
+    name: 'محمد رضایی',
+    business: 'الکترونیک پردیس',
+    image: '/placeholder-avatar-3.jpg',
+    quote: 'سیستم مدیریت سفارشات و گزارش‌گیری‌هاش دقیقاً همون چیزی بود که می‌خواستم.'
+  }
 ]
 
 export function CTA() {
   return (
-    <section className="bg-gray-900 py-24 sm:py-32" id="pricing">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        {/* Header */}
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            پلن مناسب خود را انتخاب کنید
-          </h2>
-          <p className="mt-6 text-lg leading-8 text-gray-300">
-            با هر کدام از پلن‌های ما، همین امروز فروشگاه آنلاین خود را راه‌اندازی کنید.
-            بدون قرارداد طولانی‌مدت، لغو در هر زمان.
-          </p>
-        </div>
+    <section className="py-24 bg-gradient-to-b from-white to-gray-50" dir="rtl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Pricing Plans */}
-        <div className="mx-auto mt-16 grid max-w-lg grid-cols-1 items-center gap-y-6 sm:mt-20 sm:gap-y-0 lg:max-w-4xl lg:grid-cols-3">
-          {plans.map((plan, planIdx) => (
-            <div
-              key={plan.name}
-              className={`relative rounded-3xl p-8 ring-1 ${
-                plan.popular
-                  ? 'bg-white shadow-2xl ring-gray-900/10 lg:z-10 lg:rounded-b-none'
-                  : 'bg-white/5 ring-white/10 lg:bg-transparent lg:pb-14 lg:ring-0'
-              } ${
-                planIdx === 0 ? 'lg:rounded-r-none' : ''
-              } ${
-                planIdx === plans.length - 1 ? 'lg:rounded-l-none' : ''
-              }`}
+        {/* Pricing Section */}
+        <div className="text-center mb-20">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-4xl md:text-5xl font-bold text-gray-900 mb-6"
+          >
+            انتخاب
+            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {" "}پلان مناسب
+            </span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-xl text-gray-600 max-w-2xl mx-auto"
+          >
+            پلان مناسب با نیازهای کسب‌وکار خود را انتخاب کنید
+          </motion.p>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
+          {plans.map((plan, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: index * 0.1 }}
+              className={`relative rounded-3xl p-8 ${
+                plan.highlighted 
+                  ? 'bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 scale-105' 
+                  : 'bg-white border border-gray-200'
+              } shadow-lg hover:shadow-2xl transition-all duration-300`}
             >
-              {plan.popular && (
-                <div className="absolute -top-5 left-0 right-0 mx-auto w-32 rounded-full bg-gradient-to-r from-red-600 to-blue-600 px-3 py-2 text-center text-sm font-medium text-white">
-                  محبوب‌ترین
+              {plan.highlighted && (
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-semibold">
+                    پیشنهاد ویژه
+                  </span>
                 </div>
               )}
-              
-              <div className="flex items-center justify-between gap-x-4">
-                <h3 className={`text-lg font-semibold leading-8 ${
-                  plan.popular ? 'text-gray-900' : 'text-white'
-                }`}>
-                  {plan.name}
-                </h3>
+
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                <p className="text-gray-600 mb-4">{plan.description}</p>
+                
+                <div className="mb-4">
+                  {plan.price === 'تماس بگیرید' ? (
+                    <div className="text-2xl font-bold text-gray-900">{plan.price}</div>
+                  ) : (
+                    <div className="flex items-baseline justify-center gap-2">
+                      {plan.originalPrice && (
+                        <span className="text-lg text-gray-400 line-through">
+                          {plan.originalPrice} تومان
+                        </span>
+                      )}
+                      <span className="text-4xl font-bold text-gray-900">
+                        {plan.price}
+                      </span>
+                      {plan.price !== '۰' && (
+                        <span className="text-gray-600">تومان/ماه</span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              
-              <p className={`mt-4 text-sm leading-6 ${
-                plan.popular ? 'text-gray-600' : 'text-gray-300'
-              }`}>
-                {plan.description}
-              </p>
-              
-              <p className="mt-6 flex items-baseline gap-x-1">
-                <span className={`text-4xl font-bold tracking-tight ${
-                  plan.popular ? 'text-gray-900' : 'text-white'
-                }`}>
-                  {plan.price}
-                </span>
-                <span className={`text-sm font-semibold leading-6 ${
-                  plan.popular ? 'text-gray-600' : 'text-gray-300'
-                }`}>
-                  {plan.price !== '۰' ? '/ماه' : ''}
-                </span>
-              </p>
-              
-              <ul className={`mt-8 space-y-3 text-sm leading-6 ${
-                plan.popular ? 'text-gray-600' : 'text-gray-300'
-              }`}>
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex gap-x-3">
-                    <CheckIcon className={`h-6 w-5 flex-none ${
-                      plan.popular ? 'text-green-600' : 'text-green-400'
-                    }`} aria-hidden="true" />
-                    {feature}
+
+              <ul className="space-y-4 mb-8">
+                {plan.features.map((feature, featureIndex) => (
+                  <li key={featureIndex} className="flex items-start gap-3">
+                    <CheckIcon className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-gray-700">{feature}</span>
+                  </li>
+                ))}
+                {plan.limitations.map((limitation, limitIndex) => (
+                  <li key={`limit-${limitIndex}`} className="flex items-start gap-3 opacity-60">
+                    <div className="w-5 h-5 flex-shrink-0 mt-0.5 flex items-center justify-center">
+                      <div className="w-3 h-3 bg-gray-300 rounded-full" />
+                    </div>
+                    <span className="text-gray-500">{limitation}</span>
                   </li>
                 ))}
               </ul>
-              
-              <Button
-                className={`mt-8 w-full ${
-                  plan.popular
-                    ? 'bg-gradient-to-r from-red-600 to-blue-600 hover:from-red-700 hover:to-blue-700 text-white'
-                    : 'bg-white/10 text-white hover:bg-white/20'
-                }`}
-                size="lg"
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`w-full py-4 px-6 text-white font-semibold rounded-xl transition-all duration-300 ${plan.buttonColor}`}
               >
-                {plan.price === '۰' ? 'شروع رایگان' : 'انتخاب پلن'}
-                <ArrowLeftIcon className="mr-2 h-4 w-4" />
-              </Button>
-            </div>
+                {plan.buttonText}
+              </motion.button>
+            </motion.div>
           ))}
         </div>
-        
-        {/* Bottom CTA */}
-        <div className="mt-24 rounded-3xl bg-white/5 p-8 ring-1 ring-white/10 lg:p-16">
-          <div className="mx-auto max-w-2xl text-center">
-            <h3 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              هنوز مطمئن نیستید؟
-            </h3>
-            <p className="mt-4 text-lg leading-8 text-gray-300">
-              با تیم فنی ما تماس بگیرید تا بهترین پلن را برای کسب‌وکار شما پیدا کنیم.
-              مشاوره رایگان و بدون تعهد.
-            </p>
+
+        {/* Testimonials */}
+        <div className="mb-20">
+          <motion.h3
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-3xl font-bold text-center text-gray-900 mb-16"
+          >
+            نظرات مشتریان ما
+          </motion.h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300"
+              >
+                <div className="flex items-center mb-6">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {testimonial.name.charAt(0)}
+                  </div>
+                  <div className="mr-4">
+                    <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
+                    <p className="text-sm text-gray-600">{testimonial.business}</p>
+                  </div>
+                </div>
+                <p className="text-gray-700 leading-relaxed">"{testimonial.quote}"</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* Final CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center"
+        >
+          <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-12 text-white relative overflow-hidden">
+            {/* Background Elements */}
+            <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-10" />
+            <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20" />
+            <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20" />
             
-            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-gray-900">
-                مشاوره رایگان
-              </Button>
-              <div className="text-sm text-gray-400">
-                یا با ما تماس بگیرید: ۰۲۱-۱۲۳۴۵۶۷۸
+            <div className="relative z-10">
+              <h3 className="text-4xl md:text-5xl font-bold mb-6">
+                همین الان شروع کنید
+              </h3>
+              <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+                ۱۴ روز رایگان امتحان کنید. بدون نیاز به کارت اعتباری. 
+                هر وقت خواستید لغو کنید.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  href="/register"
+                  className="group px-8 py-4 bg-white text-gray-900 font-semibold rounded-full hover:bg-gray-100 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                >
+                  شروع رایگان
+                  <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                </Link>
+                <Link
+                  href="/contact"
+                  className="px-8 py-4 bg-transparent border-2 border-white text-white font-semibold rounded-full hover:bg-white hover:text-gray-900 transition-all duration-300"
+                >
+                  تماس با فروش
+                </Link>
+              </div>
+
+              <div className="mt-8 text-sm text-gray-400">
+                بیش از ۱۰۰۰ فروشگاه به ما اعتماد کرده‌اند
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   )
