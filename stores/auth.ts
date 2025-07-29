@@ -1,24 +1,24 @@
-/**
- * Authentication Store
- * Manages user authentication state and related operations
- */
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { api, User } from '../lib/api';
-import { toast } from 'react-hot-toast';
+import { apiClient, User, handleApiError } from '@/lib/api';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
+  loading: boolean;
+  error: string | null;
   
   // Actions
-  sendOtp: (phone: string) => Promise<boolean>;
-  verifyOtp: (phone: string, otp: string) => Promise<boolean>;
-  logout: () => void;
+  sendOTP: (phone: string) => Promise<boolean>;
+  verifyOTP: (phone: string, code: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  refreshToken: () => Promise<boolean>;
   updateProfile: (data: Partial<User>) => Promise<boolean>;
-  checkAuth: () => Promise<void>;
+  clearError: () => void;
+  
+  // Getters
+  isStoreOwner: () => boolean;
+  isCustomer: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -26,89 +26,113 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
-      isLoading: false,
+      loading: false,
+      error: null,
 
-      sendOtp: async (phone: string) => {
-        set({ isLoading: true });
+      sendOTP: async (phone: string) => {
+        set({ loading: true, error: null });
+        
         try {
-          await api.sendOtp(phone);
-          toast.success('کد تأیید ارسال شد');
+          await apiClient.sendOTP(phone);
+          set({ loading: false });
           return true;
         } catch (error) {
-          console.error('Send OTP error:', error);
+          const errorMessage = handleApiError(error);
+          set({ loading: false, error: errorMessage });
           return false;
-        } finally {
-          set({ isLoading: false });
         }
       },
 
-      verifyOtp: async (phone: string, otp: string) => {
-        set({ isLoading: true });
+      verifyOTP: async (phone: string, code: string) => {
+        set({ loading: true, error: null });
+        
         try {
-          const response = await api.verifyOtp(phone, otp);
-          api.setToken(response.token);
-          
+          const result = await apiClient.verifyOTP(phone, code);
           set({
-            user: response.user,
+            user: result.user,
             isAuthenticated: true,
+            loading: false,
+            error: null,
           });
-          
-          toast.success('با موفقیت وارد شدید');
           return true;
         } catch (error) {
-          console.error('Verify OTP error:', error);
+          const errorMessage = handleApiError(error);
+          set({ loading: false, error: errorMessage });
           return false;
-        } finally {
-          set({ isLoading: false });
         }
       },
 
-      logout: () => {
-        api.clearToken();
+      logout: async () => {
+        set({ loading: true });
+        
+        try {
+          await apiClient.logout();
+        } catch (error) {
+          // Ignore logout errors, clear local state anyway
+          console.error('Logout error:', error);
+        }
+        
         set({
           user: null,
           isAuthenticated: false,
+          loading: false,
+          error: null,
         });
-        toast.success('با موفقیت خارج شدید');
       },
 
-      updateProfile: async (data: Partial<User>) => {
-        set({ isLoading: true });
+      refreshToken: async () => {
+        if (!get().isAuthenticated) {
+          return false;
+        }
+
         try {
-          const updatedUser = await api.updateProfile(data);
-          set({ user: updatedUser });
-          toast.success('پروفایل به‌روزرسانی شد');
+          await apiClient.refreshToken();
           return true;
         } catch (error) {
-          console.error('Update profile error:', error);
-          return false;
-        } finally {
-          set({ isLoading: false });
-        }
-      },
-
-      checkAuth: async () => {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-        if (!token) return;
-
-        try {
-          const user = await api.getCurrentUser();
-          set({
-            user,
-            isAuthenticated: true,
-          });
-        } catch (error) {
-          // Token is invalid, clear it
-          api.clearToken();
+          // If refresh fails, logout user
           set({
             user: null,
             isAuthenticated: false,
+            error: null,
           });
+          return false;
         }
+      },
+
+      updateProfile: async (data: Partial<User>) => {
+        set({ loading: true, error: null });
+        
+        try {
+          const result = await apiClient.updateProfile(data);
+          set({
+            user: result.user,
+            loading: false,
+          });
+          return true;
+        } catch (error) {
+          const errorMessage = handleApiError(error);
+          set({ loading: false, error: errorMessage });
+          return false;
+        }
+      },
+
+      clearError: () => {
+        set({ error: null });
+      },
+
+      // Getters
+      isStoreOwner: () => {
+        const { user } = get();
+        return user?.is_store_owner || false;
+      },
+
+      isCustomer: () => {
+        const { user } = get();
+        return user?.is_customer || false;
       },
     }),
     {
-      name: 'auth-store',
+      name: 'auth-storage',
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
@@ -116,3 +140,24 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Hook for checking authentication status
+export const useAuth = () => {
+  const auth = useAuthStore();
+  
+  return {
+    ...auth,
+    isReady: !auth.loading,
+  };
+};
+
+// Hook for requiring authentication
+export const useRequireAuth = () => {
+  const auth = useAuth();
+  
+  if (!auth.isAuthenticated && !auth.loading) {
+    throw new Error('Authentication required');
+  }
+  
+  return auth;
+};
