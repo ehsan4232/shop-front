@@ -1,136 +1,19 @@
-/**
- * API Client for Mall Platform Frontend
- * Handles all backend API communications with proper error handling,
- * authentication, and tenant context
- */
+import { z } from 'zod';
 
-import { toast } from 'react-hot-toast';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 // Types
-export interface ApiResponse<T = any> {
-  data: T;
-  message?: string;
-  errors?: Record<string, string[]>;
-}
-
-export interface PaginatedResponse<T = any> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
-
-export interface Product {
+export interface User {
   id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  short_description: string;
-  featured_image: string;
-  brand_name: string;
-  brand_slug: string;
-  category_name: string;
-  price_range: {
-    min: number;
-    max: number;
-    formatted_min: string;
-    formatted_max: string;
-  };
-  rating_average: number;
-  rating_count: number;
-  in_stock: boolean;
-  discount_percentage: number;
-  view_count: number;
-  sales_count: number;
-  images: ProductImage[];
-  tags: Tag[];
-  is_featured: boolean;
-  is_digital: boolean;
+  phone: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  is_store_owner: boolean;
+  is_customer: boolean;
+  is_verified: boolean;
+  avatar?: string;
   created_at: string;
-}
-
-export interface ProductDetail extends Product {
-  description: string;
-  base_price: number;
-  compare_price: number;
-  variants: ProductVariant[];
-  attributes: ProductAttribute[];
-  related_products: Product[];
-  brand: Brand;
-  category: Category;
-}
-
-export interface ProductVariant {
-  id: string;
-  sku: string;
-  price: number;
-  compare_price: number;
-  stock_quantity: number;
-  image: string;
-  is_default: boolean;
-  attributes: ProductAttribute[];
-  in_stock: boolean;
-  discount_percentage: number;
-  attribute_summary: string;
-}
-
-export interface ProductAttribute {
-  attribute_name: string;
-  attribute_type: string;
-  unit: string;
-  display_value: string;
-  color_hex: string;
-  value_image: string;
-}
-
-export interface ProductImage {
-  id: string;
-  image: string;
-  alt_text: string;
-  title: string;
-  is_featured: boolean;
-  display_order: number;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  description: string;
-  icon: string;
-  banner_image: string;
-  children: Category[];
-  product_count: number;
-  path: Array<{
-    id: string;
-    name: string;
-    name_fa: string;
-    slug: string;
-  }>;
-}
-
-export interface Brand {
-  id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  logo: string;
-  description: string;
-  product_count: number;
-  is_featured: boolean;
-}
-
-export interface Tag {
-  id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  tag_type: string;
-  color: string;
-  icon: string;
-  usage_count: number;
-  is_featured: boolean;
 }
 
 export interface Store {
@@ -138,27 +21,64 @@ export interface Store {
   name: string;
   name_fa: string;
   slug: string;
-  description: string;
-  logo: string;
-  domain: string;
-  currency: string;
+  description?: string;
+  logo?: string;
+  domain_url?: string;
+  theme: string;
+  layout: string;
+  primary_color: string;
+  secondary_color: string;
+  is_active: boolean;
 }
 
-export interface User {
+export interface Product {
   id: string;
-  phone: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  avatar: string;
-  is_store_owner: boolean;
-  is_verified: boolean;
+  name: string;
+  name_fa: string;
+  slug: string;
+  description?: string;
+  short_description?: string;
+  base_price: number;
+  compare_price?: number;
+  sku?: string;
+  stock_quantity: number;
+  featured_image?: string;
+  status: string;
+  is_featured: boolean;
+  category: Category;
+  brand?: Brand;
+  tags: Tag[];
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  name_fa: string;
+  slug: string;
+  parent?: string;
+  children?: Category[];
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  name_fa: string;
+  slug: string;
+  logo?: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  name_fa: string;
+  color: string;
+  tag_type: string;
 }
 
 export interface CartItem {
   id: string;
   product: Product;
-  product_variant?: ProductVariant;
+  variant?: any;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -167,380 +87,450 @@ export interface CartItem {
 export interface Cart {
   id: string;
   items: CartItem[];
-  total_amount: number;
   total_items: number;
+  total_amount: number;
+  final_amount: number;
 }
 
-// Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+// API Error type
+export interface ApiError {
+  message: string;
+  errors?: Record<string, string[]>;
+  status: number;
+}
 
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
 
-  constructor() {
-    this.baseURL = API_BASE_URL;
-    
-    // Load token from localStorage on client side
+  constructor(baseURL: string) {
+    this.baseURL = baseURL;
+    // Try to get token from localStorage on client side
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = localStorage.getItem('access_token');
     }
   }
 
-  // Authentication methods
-  setToken(token: string) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
-    }
-  }
-
-  clearToken() {
-    this.token = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-    }
-  }
-
-  // HTTP methods
-  private async request<T = any>(
+  private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+        ...options.headers,
+      },
+      ...options,
     };
 
-    if (this.token) {
-      headers.Authorization = `Token ${this.token}`;
-    }
-
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-
+      const response = await fetch(url, config);
+      
       if (!response.ok) {
-        await this.handleErrorResponse(response);
+        const errorData = await response.json().catch(() => ({}));
+        throw new ApiError({
+          message: errorData.error || errorData.message || 'خطا در ارتباط با سرور',
+          errors: errorData.errors,
+          status: response.status,
+        });
       }
 
-      const data = await response.json();
-      return data;
+      // Handle empty responses
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return response.json();
+      }
+      
+      return {} as T;
     } catch (error) {
-      console.error('API Request failed:', error);
-      throw error;
-    }
-  }
-
-  private async handleErrorResponse(response: Response) {
-    let errorMessage = 'خطای غیرمنتظره';
-    
-    try {
-      const errorData = await response.json();
-      
-      if (errorData.message) {
-        errorMessage = errorData.message;
-      } else if (errorData.detail) {
-        errorMessage = errorData.detail;
-      } else if (errorData.errors) {
-        // Handle field validation errors
-        const fieldErrors = Object.values(errorData.errors).flat();
-        errorMessage = fieldErrors.join(', ');
+      if (error instanceof ApiError) {
+        throw error;
       }
-    } catch {
-      // If response is not JSON, use status text
-      errorMessage = response.statusText || `خطای ${response.status}`;
-    }
-
-    // Handle specific status codes
-    if (response.status === 401) {
-      this.clearToken();
-      errorMessage = 'لطفاً مجدداً وارد شوید';
       
-      // Redirect to login if on client side
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login';
-      }
-    } else if (response.status === 403) {
-      errorMessage = 'دسترسی غیرمجاز';
-    } else if (response.status === 404) {
-      errorMessage = 'یافت نشد';
-    } else if (response.status >= 500) {
-      errorMessage = 'خطای سرور. لطفاً بعداً تلاش کنید';
+      throw new ApiError({
+        message: 'خطا در ارتباط با سرور',
+        status: 0,
+      });
     }
-
-    toast.error(errorMessage);
-    throw new Error(errorMessage);
   }
 
-  async get<T = any>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' });
-  }
-
-  async post<T = any>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, {
+  // Authentication methods
+  async sendOTP(phone: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/send-otp/', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ phone }),
     });
   }
 
-  async put<T = any>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, {
+  async verifyOTP(phone: string, code: string): Promise<{
+    access: string;
+    refresh: string;
+    user: User;
+    message: string;
+  }> {
+    const result = await this.request<{
+      access: string;
+      refresh: string;
+      user: User;
+      message: string;
+    }>('/auth/verify-otp/', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code }),
+    });
+
+    // Store tokens
+    this.token = result.access;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('access_token', result.access);
+      localStorage.setItem('refresh_token', result.refresh);
+    }
+
+    return result;
+  }
+
+  async refreshToken(): Promise<{ access: string }> {
+    const refreshToken = typeof window !== 'undefined' 
+      ? localStorage.getItem('refresh_token') 
+      : null;
+    
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const result = await this.request<{ access: string }>('/auth/refresh/', {
+      method: 'POST',
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+
+    this.token = result.access;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('access_token', result.access);
+    }
+
+    return result;
+  }
+
+  async logout(): Promise<void> {
+    const refreshToken = typeof window !== 'undefined' 
+      ? localStorage.getItem('refresh_token') 
+      : null;
+
+    if (refreshToken) {
+      await this.request('/auth/logout/', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+    }
+
+    this.token = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+    }
+  }
+
+  async getProfile(): Promise<{ user: User }> {
+    return this.request<{ user: User }>('/profile/');
+  }
+
+  async updateProfile(data: Partial<User>): Promise<{ user: User }> {
+    return this.request<{ user: User }>('/profile/update/', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
-  async patch<T = any>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
+  // Store methods
+  async getStores(): Promise<Store[]> {
+    const result = await this.request<{ results: Store[] }>('/stores/');
+    return result.results;
+  }
+
+  async getStore(storeId: string): Promise<Store> {
+    return this.request<Store>(`/stores/${storeId}/`);
+  }
+
+  async createStore(storeData: Partial<Store>): Promise<Store> {
+    return this.request<Store>('/stores/', {
+      method: 'POST',
+      body: JSON.stringify(storeData),
     });
   }
 
-  async delete<T = any>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
-  }
-
-  // Authentication API
-  async sendOtp(phone: string): Promise<{ message: string }> {
-    return this.post('/auth/send-otp/', { phone });
-  }
-
-  async verifyOtp(phone: string, otp: string): Promise<{ token: string; user: User }> {
-    return this.post('/auth/verify-otp/', { phone, otp });
-  }
-
-  async getCurrentUser(): Promise<User> {
-    return this.get('/auth/me/');
-  }
-
-  async updateProfile(data: Partial<User>): Promise<User> {
-    return this.patch('/auth/profile/', data);
-  }
-
-  // Products API
-  async getProducts(params?: {
-    store?: string;
-    category?: string;
-    brand?: string;
-    tags?: string;
-    min_price?: number;
-    max_price?: number;
-    in_stock?: boolean;
-    search?: string;
-    ordering?: string;
-    page?: number;
-  }): Promise<PaginatedResponse<Product>> {
-    const queryParams = new URLSearchParams();
-    
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        queryParams.append(key, value.toString());
-      }
-    });
-
-    const queryString = queryParams.toString();
-    return this.get(`/products/${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getProduct(slug: string): Promise<ProductDetail> {
-    return this.get(`/products/${slug}/`);
-  }
-
-  async getProductRecommendations(productId: string): Promise<Product[]> {
-    return this.get(`/products/${productId}/recommendations/`);
-  }
-
-  async searchProducts(query: string, store?: string, limit?: number): Promise<{
-    products: Product[];
-    total_found: number;
-  }> {
-    const params = new URLSearchParams({ q: query });
-    if (store) params.append('store', store);
-    if (limit) params.append('limit', limit.toString());
-    
-    return this.get(`/products/search/?${params.toString()}`);
-  }
-
-  // Categories API
-  async getCategories(store?: string): Promise<Category[]> {
-    const params = store ? `?store=${store}` : '';
-    return this.get(`/categories/${params}`);
-  }
-
-  async getCategory(slug: string): Promise<Category> {
-    return this.get(`/categories/${slug}/`);
-  }
-
-  async getCategoryFilters(slug: string): Promise<Record<string, any>> {
-    return this.get(`/categories/${slug}/filters/`);
-  }
-
-  // Brands API
-  async getBrands(store?: string): Promise<Brand[]> {
-    const params = store ? `?store=${store}` : '';
-    return this.get(`/brands/${params}`);
-  }
-
-  async getBrand(slug: string): Promise<Brand> {
-    return this.get(`/brands/${slug}/`);
-  }
-
-  // Tags API
-  async getTags(store?: string, type?: string, featured?: boolean): Promise<Tag[]> {
-    const params = new URLSearchParams();
-    if (store) params.append('store', store);
-    if (type) params.append('type', type);
-    if (featured) params.append('featured', 'true');
-    
-    const queryString = params.toString();
-    return this.get(`/tags/${queryString ? `?${queryString}` : ''}`);
-  }
-
-  // Cart API
-  async getCart(): Promise<Cart> {
-    return this.get('/cart/');
-  }
-
-  async addToCart(productId: string, variantId?: string, quantity: number = 1): Promise<CartItem> {
-    return this.post('/cart/add/', {
-      product: productId,
-      product_variant: variantId,
-      quantity
+  async updateStore(storeId: string, storeData: Partial<Store>): Promise<Store> {
+    return this.request<Store>(`/stores/${storeId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(storeData),
     });
   }
 
-  async updateCartItem(itemId: string, quantity: number): Promise<CartItem> {
-    return this.patch(`/cart/items/${itemId}/`, { quantity });
-  }
-
-  async removeFromCart(itemId: string): Promise<void> {
-    return this.delete(`/cart/items/${itemId}/`);
-  }
-
-  async clearCart(): Promise<void> {
-    return this.delete('/cart/clear/');
-  }
-
-  // Wishlist API
-  async getWishlist(): Promise<Product[]> {
-    return this.get('/wishlist/');
-  }
-
-  async addToWishlist(productId: string): Promise<void> {
-    return this.post('/wishlist/add/', { product: productId });
-  }
-
-  async removeFromWishlist(productId: string): Promise<void> {
-    return this.delete(`/wishlist/remove/${productId}/`);
-  }
-
-  // Store API
-  async getStoreInfo(storeId?: string): Promise<Store> {
-    const params = storeId ? `?store=${storeId}` : '';
-    return this.get(`/store/info/${params}`);
-  }
-
-  async getStoreStatistics(storeId?: string): Promise<{
-    total_products: number;
-    total_categories: number;
-    total_brands: number;
-    featured_products: number;
-    recent_products: Product[];
-    popular_products: Product[];
-    featured_collections: any[];
+  // Product methods
+  async getProducts(storeId?: string, filters?: any): Promise<{
+    results: Product[];
+    count: number;
+    next?: string;
+    previous?: string;
   }> {
-    const params = storeId ? `?store=${storeId}` : '';
-    return this.get(`/store/statistics/${params}`);
+    const params = new URLSearchParams(filters).toString();
+    const endpoint = storeId 
+      ? `/stores/${storeId}/products/?${params}`
+      : `/products/?${params}`;
+    
+    return this.request<{
+      results: Product[];
+      count: number;
+      next?: string;
+      previous?: string;
+    }>(endpoint);
   }
 
-  // Social Media API
-  async getSocialAccounts(): Promise<any[]> {
-    return this.get('/social-media/accounts/');
+  async getProduct(productId: string, storeId?: string): Promise<Product> {
+    const endpoint = storeId 
+      ? `/stores/${storeId}/products/${productId}/`
+      : `/products/${productId}/`;
+    
+    return this.request<Product>(endpoint);
   }
 
-  async connectSocialAccount(platform: string, data: any): Promise<any> {
-    return this.post('/social-media/connect/', { platform, ...data });
+  async createProduct(storeId: string, productData: any): Promise<Product> {
+    return this.request<Product>(`/stores/${storeId}/products/`, {
+      method: 'POST',
+      body: JSON.stringify(productData),
+    });
   }
 
-  async importSocialPosts(accountId: string, options: {
-    limit?: number;
-    create_products?: boolean;
-  } = {}): Promise<any> {
-    return this.post(`/social-media/import/${accountId}/`, options);
+  async createBulkProducts(storeId: string, productsData: any[]): Promise<Product[]> {
+    return this.request<Product[]>(`/stores/${storeId}/products/bulk/`, {
+      method: 'POST',
+      body: JSON.stringify({ products: productsData }),
+    });
   }
 
-  async getSocialPosts(accountId?: string): Promise<any[]> {
-    const params = accountId ? `?account=${accountId}` : '';
-    return this.get(`/social-media/posts/${params}`);
+  async updateProduct(storeId: string, productId: string, productData: any): Promise<Product> {
+    return this.request<Product>(`/stores/${storeId}/products/${productId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(productData),
+    });
   }
 
-  // File Upload
-  async uploadFile(file: File, type: 'image' | 'video' | 'document' = 'image'): Promise<{
-    url: string;
-    filename: string;
-  }> {
+  async deleteProduct(storeId: string, productId: string): Promise<void> {
+    return this.request<void>(`/stores/${storeId}/products/${productId}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Category methods
+  async getCategories(storeId?: string): Promise<Category[]> {
+    const endpoint = storeId 
+      ? `/stores/${storeId}/categories/`
+      : `/categories/`;
+    
+    const result = await this.request<{ results: Category[] }>(endpoint);
+    return result.results;
+  }
+
+  async getCategory(categoryId: string, storeId?: string): Promise<Category> {
+    const endpoint = storeId 
+      ? `/stores/${storeId}/categories/${categoryId}/`
+      : `/categories/${categoryId}/`;
+    
+    return this.request<Category>(endpoint);
+  }
+
+  async createCategory(storeId: string, categoryData: any): Promise<Category> {
+    return this.request<Category>(`/stores/${storeId}/categories/`, {
+      method: 'POST',
+      body: JSON.stringify(categoryData),
+    });
+  }
+
+  // Brand methods
+  async getBrands(storeId?: string): Promise<Brand[]> {
+    const endpoint = storeId 
+      ? `/stores/${storeId}/brands/`
+      : `/brands/`;
+    
+    const result = await this.request<{ results: Brand[] }>(endpoint);
+    return result.results;
+  }
+
+  // Cart methods
+  async getCart(storeId: string): Promise<Cart> {
+    return this.request<Cart>(`/stores/${storeId}/cart/`);
+  }
+
+  async addToCart(storeId: string, productId: string, variantId?: string, quantity: number = 1): Promise<Cart> {
+    return this.request<Cart>(`/stores/${storeId}/cart/add/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        product_id: productId,
+        variant_id: variantId,
+        quantity,
+      }),
+    });
+  }
+
+  async updateCartItem(storeId: string, itemId: string, quantity: number): Promise<Cart> {
+    return this.request<Cart>(`/stores/${storeId}/cart/items/${itemId}/`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantity }),
+    });
+  }
+
+  async removeCartItem(storeId: string, itemId: string): Promise<Cart> {
+    return this.request<Cart>(`/stores/${storeId}/cart/items/${itemId}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  async clearCart(storeId: string): Promise<void> {
+    return this.request<void>(`/stores/${storeId}/cart/clear/`, {
+      method: 'POST',
+    });
+  }
+
+  // Order methods
+  async createOrder(storeId: string, orderData: any): Promise<any> {
+    return this.request<any>(`/stores/${storeId}/orders/`, {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    });
+  }
+
+  async getOrders(storeId?: string, filters?: any): Promise<any[]> {
+    const params = new URLSearchParams(filters).toString();
+    const endpoint = storeId 
+      ? `/stores/${storeId}/orders/?${params}`
+      : `/orders/?${params}`;
+    
+    const result = await this.request<{ results: any[] }>(endpoint);
+    return result.results;
+  }
+
+  async getOrder(orderId: string, storeId?: string): Promise<any> {
+    const endpoint = storeId 
+      ? `/stores/${storeId}/orders/${orderId}/`
+      : `/orders/${orderId}/`;
+    
+    return this.request<any>(endpoint);
+  }
+
+  // Payment methods
+  async createPayment(storeId: string, orderId: string, paymentData: any): Promise<any> {
+    return this.request<any>(`/stores/${storeId}/orders/${orderId}/payment/`, {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
+  }
+
+  async verifyPayment(storeId: string, transactionId: string, verificationData: any): Promise<any> {
+    return this.request<any>(`/stores/${storeId}/payments/${transactionId}/verify/`, {
+      method: 'POST',
+      body: JSON.stringify(verificationData),
+    });
+  }
+
+  // Social Media methods
+  async getSocialMediaPosts(storeId: string): Promise<any[]> {
+    const result = await this.request<{ results: any[] }>(`/stores/${storeId}/social-media/posts/`);
+    return result.results;
+  }
+
+  async importSocialMediaPost(storeId: string, postId: string, categoryId: string, additionalData?: any): Promise<Product> {
+    return this.request<Product>(`/stores/${storeId}/social-media/import/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        social_media_post_id: postId,
+        category_id: categoryId,
+        additional_data: additionalData,
+      }),
+    });
+  }
+
+  async connectSocialMediaAccount(storeId: string, platform: string, accountData: any): Promise<any> {
+    return this.request<any>(`/stores/${storeId}/social-media/connect/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        platform,
+        ...accountData,
+      }),
+    });
+  }
+
+  // File upload helper
+  async uploadFile(endpoint: string, file: File, additionalData?: Record<string, any>): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('type', type);
-
-    const response = await fetch(`${this.baseURL}/upload/`, {
-      method: 'POST',
-      headers: {
-        Authorization: this.token ? `Token ${this.token}` : '',
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      await this.handleErrorResponse(response);
+    
+    if (additionalData) {
+      Object.keys(additionalData).forEach(key => {
+        formData.append(key, additionalData[key]);
+      });
     }
 
-    return response.json();
+    return this.request<any>(endpoint, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // Remove Content-Type header to let browser set boundary for FormData
+        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      },
+    });
+  }
+
+  // Analytics methods
+  async getStoreAnalytics(storeId: string, period?: string): Promise<any> {
+    const params = period ? `?period=${period}` : '';
+    return this.request<any>(`/stores/${storeId}/analytics/${params}`);
+  }
+
+  async getProductAnalytics(storeId: string, productId: string): Promise<any> {
+    return this.request<any>(`/stores/${storeId}/products/${productId}/analytics/`);
   }
 }
 
-// Create singleton instance
-export const api = new ApiClient();
+// Create ApiError class
+class ApiError extends Error {
+  public status: number;
+  public errors?: Record<string, string[]>;
 
-// Export API client class for testing or custom instances
-export default ApiClient;
+  constructor({ message, status, errors }: { message: string; status: number; errors?: Record<string, string[]> }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.errors = errors;
+  }
+}
 
-// Utility functions
-export const buildImageUrl = (path: string): string => {
-  if (!path) return '';
-  if (path.startsWith('http')) return path;
+// Export singleton instance
+export const apiClient = new ApiClient(API_BASE_URL);
+
+// Export class for creating custom instances
+export { ApiClient, ApiError };
+
+// Helper function to handle API errors
+export const handleApiError = (error: unknown): string => {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
   
-  const baseUrl = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
-  return `${baseUrl}${path}`;
+  if (error instanceof Error) {
+    return error.message;
+  }
+  
+  return 'خطای ناشناخته';
 };
 
-export const formatPrice = (price: number, currency: string = 'تومان'): string => {
-  return `${price.toLocaleString('fa-IR')} ${currency}`;
+// Helper function to format Iranian currency
+export const formatPrice = (price: number): string => {
+  return new Intl.NumberFormat('fa-IR').format(price) + ' تومان';
 };
 
-export const formatDate = (date: string): string => {
-  return new Intl.DateTimeFormat('fa-IR').format(new Date(date));
-};
-
-// React Query keys for caching
-export const queryKeys = {
-  products: (params?: any) => ['products', params],
-  product: (slug: string) => ['product', slug],
-  categories: (store?: string) => ['categories', store],
-  category: (slug: string) => ['category', slug],
-  brands: (store?: string) => ['brands', store],
-  brand: (slug: string) => ['brand', slug],
-  cart: () => ['cart'],
-  wishlist: () => ['wishlist'],
-  user: () => ['user'],
-  store: (id?: string) => ['store', id],
-  storeStats: (id?: string) => ['store-stats', id],
-  socialAccounts: () => ['social-accounts'],
-  socialPosts: (accountId?: string) => ['social-posts', accountId],
+// Helper function to format dates in Persian
+export const formatDate = (date: string | Date): string => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('fa-IR').format(dateObj);
 };
