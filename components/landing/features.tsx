@@ -1,121 +1,198 @@
-import {
-  CloudArrowUpIcon,
-  LockClosedIcon,
-  ServerIcon,
-  ShoppingCartIcon,
+'use client'
+
+import { motion } from 'framer-motion'
+import { 
+  ShoppingBagIcon, 
+  ChartBarIcon, 
   DevicePhoneMobileIcon,
   CurrencyDollarIcon,
-  ChartBarIcon,
+  UserGroupIcon,
   GlobeAltIcon,
+  SparklesIcon,
+  ShieldCheckIcon 
 } from '@heroicons/react/24/outline'
 
 const features = [
   {
-    name: 'ایجاد فروشگاه در ۵ دقیقه',
-    description: 'با چند کلیک ساده، فروشگاه آنلاین خود را راه‌اندازی کنید. بدون نیاز به دانش فنی یا برنامه‌نویسی.',
-    icon: ShoppingCartIcon,
-    color: 'bg-blue-500',
+    icon: ShoppingBagIcon,
+    title: 'مدیریت محصولات',
+    description: 'افزودن و مدیریت محصولات با ویژگی‌های پیشرفته، دسته‌بندی هوشمند و وارد کردن از شبکه‌های اجتماعی',
+    color: 'from-blue-500 to-blue-600'
   },
   {
-    name: 'پشتیبانی کامل فارسی',
-    description: 'رابط کاربری، تقویم، اعداد و تمام قابلیت‌های پلتفرم به صورت کامل فارسی‌سازی شده است.',
-    icon: GlobeAltIcon,
-    color: 'bg-green-500',
-  },
-  {
-    name: 'واردات از شبکه‌های اجتماعی',
-    description: 'محصولات خود را مستقیماً از اینستاگرام و تلگرام وارد کنید. تصاویر و توضیحات به صورت خودکار دریافت می‌شود.',
-    icon: DevicePhoneMobileIcon,
-    color: 'bg-purple-500',
-  },
-  {
-    name: 'درگاه‌های پرداخت ایرانی',
-    description: 'اتصال مستقیم به زرین‌پال، پارسیان، ملت و سایر درگاه‌های پرداخت معتبر کشور.',
-    icon: CurrencyDollarIcon,
-    color: 'bg-yellow-500',
-  },
-  {
-    name: 'مدیریت موجودی هوشمند',
-    description: 'کنترل موجودی، هشدار کمبود کالا، مدیریت انواع محصول و ویژگی‌های نامحدود.',
-    icon: ServerIcon,
-    color: 'bg-red-500',
-  },
-  {
-    name: 'آمار و گزارش‌گیری',
-    description: 'داشبورد تحلیلی پیشرفته با نمودارهای فروش، بازدید مشتریان و عملکرد محصولات.',
     icon: ChartBarIcon,
-    color: 'bg-indigo-500',
+    title: 'آنالیتیکس پیشرفته',
+    description: 'گزارشات فروش، تحلیل رفتار مشتریان، و داشبورد مدیریتی برای بهبود عملکرد فروشگاه',
+    color: 'from-green-500 to-green-600'
   },
   {
-    name: 'امنیت بالا',
-    description: 'احراز هویت دو مرحله‌ای، رمزگذاری اطلاعات و پشتیبان‌گیری خودکار از داده‌های شما.',
-    icon: LockClosedIcon,
-    color: 'bg-gray-700',
+    icon: DevicePhoneMobileIcon,
+    title: 'طراحی ریسپانسیو',
+    description: 'فروشگاه شما در تمام دستگاه‌ها عالی نمایش داده می‌شود و تجربه کاربری فوق‌العاده‌ای ارائه می‌دهد',
+    color: 'from-purple-500 to-purple-600'
   },
   {
-    name: 'پشتیبانی ابری',
-    description: 'میزبانی ابری قدرتمند با آپتایم ۹۹.۹٪ و پشتیبانی فنی ۲۴ ساعته.',
-    icon: CloudArrowUpIcon,
-    color: 'bg-cyan-500',
+    icon: CurrencyDollarIcon,
+    title: 'درگاه‌های پرداخت',
+    description: 'اتصال به تمام درگاه‌های پرداخت ایرانی، پردازش ایمن تراکنش‌ها و مدیریت مالی پیشرفته',
+    color: 'from-yellow-500 to-orange-500'
   },
+  {
+    icon: UserGroupIcon,
+    title: 'مدیریت مشتریان',
+    description: 'پنل مشتریان، سیستم وفاداری، برنامه‌های تخفیف و ارتباط مستقیم با مشتریان',
+    color: 'from-pink-500 to-red-500'
+  },
+  {
+    icon: GlobeAltIcon,
+    title: 'SEO و بازاریابی',
+    description: 'بهینه‌سازی موتورهای جستجو، کمپین‌های بازاریابی و ابزارهای افزایش فروش',
+    color: 'from-indigo-500 to-purple-500'
+  },
+  {
+    icon: SparklesIcon,
+    title: 'اتصال شبکه‌های اجتماعی',
+    description: 'وارد کردن خودکار محتوا از تلگرام و اینستاگرام، مدیریت کانال‌های فروش',
+    color: 'from-teal-500 to-cyan-500'
+  },
+  {
+    icon: ShieldCheckIcon,
+    title: 'امنیت و پشتیبانی',
+    description: 'امنیت بالا، پشتیبان‌گیری خودکار، و پشتیبانی ۲۴/۷ برای حل مشکلات',
+    color: 'from-gray-600 to-gray-700'
+  }
 ]
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.6
+    }
+  }
+}
 
 export function Features() {
   return (
-    <section className="py-24 sm:py-32" id="features">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl lg:text-center">
-          <h2 className="text-base font-semibold leading-7 text-blue-600">امکانات پیشرفته</h2>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            همه چیز برای موفقیت کسب‌وکار آنلاین شما
-          </p>
-          <p className="mt-6 text-lg leading-8 text-gray-600">
-            پلتفرم مال تمام ابزارهای مورد نیاز برای راه‌اندازی، مدیریت و توسعه فروشگاه آنلاین موفق را در اختیار شما قرار می‌دهد.
-          </p>
+    <section className="py-24 bg-gradient-to-b from-gray-50 to-white" dir="rtl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center mb-20">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-4xl md:text-5xl font-bold text-gray-900 mb-6"
+          >
+            ویژگی‌های
+            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {" "}قدرتمند
+            </span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed"
+          >
+            تمام ابزارهایی که برای راه‌اندازی و مدیریت یک فروشگاه آنلاین موفق نیاز دارید
+          </motion.p>
         </div>
-        
-        <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-          <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-4">
-            {features.map((feature) => (
-              <div key={feature.name} className="flex flex-col group hover:scale-105 transition-transform duration-200">
-                <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-lg">
-                  <div className={`${feature.color} p-2 rounded-lg group-hover:scale-110 transition-transform duration-200`}>
-                    <feature.icon className="h-6 w-6 text-white" aria-hidden="true" />
-                  </div>
+
+        {/* Features Grid */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+        >
+          {features.map((feature, index) => (
+            <motion.div
+              key={index}
+              variants={itemVariants}
+              className="group relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-transparent"
+            >
+              {/* Background Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Icon */}
+                <div className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${feature.color} mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                  <feature.icon className="w-6 h-6 text-white" />
                 </div>
-                <dt className="text-base font-semibold leading-7 text-gray-900">
-                  {feature.name}
-                </dt>
-                <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-600">
-                  <p className="flex-auto">{feature.description}</p>
-                </dd>
+
+                {/* Title */}
+                <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-gray-800 transition-colors">
+                  {feature.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-gray-600 leading-relaxed group-hover:text-gray-700 transition-colors">
+                  {feature.description}
+                </p>
               </div>
-            ))}
-          </dl>
-        </div>
-        
-        {/* Additional Feature Highlights */}
-        <div className="mt-24">
-          <div className="rounded-2xl bg-gradient-to-r from-blue-50 to-purple-50 p-8 lg:p-16">
-            <div className="grid grid-cols-1 gap-y-8 lg:grid-cols-3 lg:gap-x-8">
-              <div className="text-center">
-                <div className="text-4xl font-bold text-blue-600">+۱۰۰۰</div>
-                <div className="mt-2 text-lg font-medium text-gray-900">فروشگاه فعال</div>
-                <div className="mt-1 text-sm text-gray-600">در سراسر کشور</div>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl font-bold text-purple-600">۹۹.۹٪</div>
-                <div className="mt-2 text-lg font-medium text-gray-900">آپتایم سرور</div>
-                <div className="mt-1 text-sm text-gray-600">در دسترس بودن مداوم</div>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl font-bold text-green-600">۲۴/۷</div>
-                <div className="mt-2 text-lg font-medium text-gray-900">پشتیبانی فنی</div>
-                <div className="mt-1 text-sm text-gray-600">همه روزه هفته</div>
+
+              {/* Decorative Elements */}
+              <div className="absolute -top-2 -right-2 w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl" />
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Bottom CTA Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="text-center mt-20"
+        >
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-12 text-white relative overflow-hidden">
+            {/* Background Pattern */}
+            <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-10" />
+            
+            <div className="relative z-10">
+              <h3 className="text-3xl md:text-4xl font-bold mb-6">
+                آماده شروع هستید؟
+              </h3>
+              <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+                با پلتفرم مال، فروشگاه آنلاین خود را همین امروز راه‌اندازی کنید
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-white text-blue-600 font-semibold rounded-full hover:bg-gray-50 transition-colors duration-300 shadow-lg"
+                >
+                  شروع رایگان
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-transparent border-2 border-white text-white font-semibold rounded-full hover:bg-white hover:text-blue-600 transition-all duration-300"
+                >
+                  مشاهده نمونه کارها
+                </motion.button>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   )
