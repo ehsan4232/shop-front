@@ -1,8 +1,3 @@
-/**
- * Color Picker Component for Product Attributes
- * Addresses product description requirement: "Color fields must be presented with colorpads"
- */
-
 'use client';
 
 import React, { useState } from 'react';
@@ -11,169 +6,143 @@ import { HexColorPicker } from 'react-colorful';
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
-  label?: string;
-  required?: boolean;
-  disabled?: boolean;
-  presetColors?: string[];
+  label: string;
+  className?: string;
 }
 
-const DEFAULT_PRESET_COLORS = [
-  '#FF0000', // قرمز
-  '#00FF00', // سبز
-  '#0000FF', // آبی
-  '#FFFF00', // زرد
-  '#FF00FF', // بنفش
-  '#00FFFF', // آبی روشن
-  '#FFA500', // نارنجی
-  '#800080', // بنفش تیره
-  '#FFC0CB', // صورتی
-  '#A52A2A', // قهوه‌ای
-  '#808080', // خاکستری
-  '#000000', // مشکی
-  '#FFFFFF', // سفید
-];
-
-export function ColorPicker({
-  value,
-  onChange,
-  label,
-  required = false,
-  disabled = false,
-  presetColors = DEFAULT_PRESET_COLORS
-}: ColorPickerProps) {
+export const ColorPicker: React.FC<ColorPickerProps> = ({ 
+  value, 
+  onChange, 
+  label, 
+  className = '' 
+}) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [customColor, setCustomColor] = useState(value || '#000000');
-
-  const handleColorSelect = (color: string) => {
-    onChange(color);
-    setIsOpen(false);
+  
+  // Common colors for quick selection
+  const commonColors = [
+    '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+    '#000000', '#FFFFFF', '#808080', '#800000', '#008000', '#000080',
+    '#FFA500', '#800080', '#008080', '#C0C0C0', '#808000', '#FF1493'
+  ];
+  
+  const handleColorChange = (newColor: string) => {
+    onChange(newColor);
   };
-
-  const handleCustomColorChange = (color: string) => {
-    setCustomColor(color);
-    onChange(color);
+  
+  const isValidHex = (hex: string) => {
+    return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex);
   };
 
   return (
-    <div className="space-y-2">
-      {label && (
-        <label className="block text-sm font-medium text-gray-700">
-          {label}
-          {required && <span className="text-red-500 mr-1">*</span>}
-        </label>
-      )}
+    <div className={`space-y-3 ${className}`}>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {label}
+      </label>
       
-      <div className="flex flex-wrap gap-2">
-        {/* Preset Color Options */}
-        {presetColors.map((color) => (
-          <button
-            key={color}
-            type="button"
-            disabled={disabled}
-            onClick={() => handleColorSelect(color)}
-            className={`
-              w-8 h-8 rounded border-2 transition-all duration-200 hover:scale-110
-              ${value === color ? 'border-gray-800 ring-2 ring-offset-2 ring-gray-400' : 'border-gray-300'}
-              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-            `}
-            style={{ backgroundColor: color }}
-            title={`انتخاب رنگ ${color}`}
-          />
-        ))}
-        
-        {/* Custom Color Picker Button */}
+      {/* Color Preview and Input */}
+      <div className="flex items-center space-x-3">
         <button
           type="button"
-          disabled={disabled}
+          className="relative w-12 h-12 border-2 border-gray-300 rounded-lg shadow-sm cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ backgroundColor: value }}
           onClick={() => setIsOpen(!isOpen)}
-          className={`
-            w-8 h-8 rounded border-2 border-dashed border-gray-400 flex items-center justify-center
-            transition-all duration-200 hover:border-gray-600
-            ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          `}
-          title="انتخاب رنگ سفارشی"
+          aria-label="انتخاب رنگ"
         >
-          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Selected Color Display */}
-      {value && (
-        <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-          <div
-            className="w-6 h-6 rounded border border-gray-300"
+          {/* Checkerboard pattern for transparency */}
+          <div className="absolute inset-0 bg-checkerboard rounded-lg"></div>
+          <div 
+            className="absolute inset-0 rounded-lg"
             style={{ backgroundColor: value }}
-          />
-          <span className="text-sm text-gray-700 font-mono">{value}</span>
-          {!disabled && (
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              className="text-red-500 hover:text-red-700 text-sm"
-              title="حذف رنگ"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Custom Color Picker Modal */}
-      {isOpen && !disabled && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4 max-w-sm w-full mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">انتخاب رنگ سفارشی</h3>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
+          ></div>
+        </button>
+        
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            if (newValue === '' || isValidHex(newValue)) {
+              handleColorChange(newValue);
+            }
+          }}
+          placeholder="#000000"
+          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+          dir="ltr"
+        />
+      </div>
+      
+      {/* Color Picker Dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 mt-2 p-4 bg-white border border-gray-300 rounded-lg shadow-lg">
+          <div className="space-y-4">
+            {/* Advanced Color Picker */}
+            <HexColorPicker 
+              color={value} 
+              onChange={handleColorChange}
+            />
+            
+            {/* Quick Color Selection */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">رنگ‌های پیش‌فرض</p>
+              <div className="grid grid-cols-6 gap-2">
+                {commonColors.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className="w-8 h-8 border border-gray-300 rounded hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ backgroundColor: color }}
+                    onClick={() => handleColorChange(color)}
+                    aria-label={`انتخاب رنگ ${color}`}
+                  />
+                ))}
+              </div>
             </div>
             
-            <div className="space-y-4">
-              <HexColorPicker 
-                color={customColor} 
-                onChange={handleCustomColorChange}
-              />
-              
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={customColor}
-                  onChange={(e) => handleCustomColorChange(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm font-mono"
-                  placeholder="#000000"
-                />
-                <div
-                  className="w-10 h-10 rounded border border-gray-300"
-                  style={{ backgroundColor: customColor }}
-                />
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleColorSelect(customColor)}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-                >
-                  انتخاب
-                </button>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400"
-                >
-                  لغو
-                </button>
-              </div>
-            </div>
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="w-full px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              بستن
+            </button>
           </div>
         </div>
       )}
+      
+      {/* Common Colors Grid */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-2">رنگ‌های متداول</p>
+        <div className="grid grid-cols-9 gap-2">
+          {commonColors.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={`w-8 h-8 border-2 rounded-md hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                value === color ? 'border-blue-500' : 'border-gray-300'
+              }`}
+              style={{ backgroundColor: color }}
+              onClick={() => handleColorChange(color)}
+              aria-label={`انتخاب رنگ ${color}`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
-}
+};
 
 export default ColorPicker;
+
+// CSS for checkerboard pattern (add to globals.css)
+/*
+.bg-checkerboard {
+  background-image: 
+    linear-gradient(45deg, #ccc 25%, transparent 25%), 
+    linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, #ccc 75%), 
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+}
+*/
