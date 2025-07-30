@@ -1,536 +1,351 @@
-import { z } from 'zod';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
-// Types
-export interface User {
-  id: string;
-  phone: string;
-  first_name: string;
-  last_name: string;
-  email?: string;
-  is_store_owner: boolean;
-  is_customer: boolean;
-  is_verified: boolean;
-  avatar?: string;
-  created_at: string;
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public data?: any
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
 }
 
-export interface Store {
-  id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  description?: string;
-  logo?: string;
-  domain_url?: string;
-  theme: string;
-  layout: string;
-  primary_color: string;
-  secondary_color: string;
-  is_active: boolean;
-}
-
-export interface Product {
-  id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  description?: string;
-  short_description?: string;
-  base_price: number;
-  compare_price?: number;
-  sku?: string;
-  stock_quantity: number;
-  featured_image?: string;
-  status: string;
-  is_featured: boolean;
-  category: Category;
-  brand?: Brand;
-  tags: Tag[];
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  parent?: string;
-  children?: Category[];
-}
-
-export interface Brand {
-  id: string;
-  name: string;
-  name_fa: string;
-  slug: string;
-  logo?: string;
-}
-
-export interface Tag {
-  id: string;
-  name: string;
-  name_fa: string;
-  color: string;
-  tag_type: string;
-}
-
-export interface CartItem {
-  id: string;
-  product: Product;
-  variant?: any;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-}
-
-export interface Cart {
-  id: string;
-  items: CartItem[];
-  total_items: number;
-  total_amount: number;
-  final_amount: number;
-}
-
-// API Error type
-export interface ApiError {
-  message: string;
-  errors?: Record<string, string[]>;
-  status: number;
+interface RequestConfig {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  headers?: Record<string, string>
+  body?: any
+  params?: Record<string, string>
 }
 
 class ApiClient {
-  private baseURL: string;
-  private token: string | null = null;
+  private baseURL: string
+  private defaultHeaders: Record<string, string>
 
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
-    // Try to get token from localStorage on client side
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('access_token');
+  constructor(baseURL?: string) {
+    this.baseURL = baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
     }
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
+  private async request<T = any>(endpoint: string, config: RequestConfig = {}): Promise<T> {
+    const {
+      method = 'GET',
+      headers = {},
+      body,
+      params
+    } = config
+
+    // Build URL with query parameters
+    const url = new URL(`${this.baseURL}${endpoint}`)
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.append(key, value)
+      })
+    }
+
+    // Get auth token from localStorage
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+
+    // Prepare headers
+    const requestHeaders = {
+      ...this.defaultHeaders,
+      ...headers,
+    }
+
+    if (token) {
+      requestHeaders.Authorization = `Bearer ${token}`
+    }
+
+    // Prepare request options
+    const requestOptions: RequestInit = {
+      method,
+      headers: requestHeaders,
+    }
+
+    // Add body for non-GET requests
+    if (body && method !== 'GET') {
+      if (body instanceof FormData) {
+        // Remove Content-Type for FormData (browser will set it)
+        delete requestHeaders['Content-Type']
+        requestOptions.body = body
+      } else {
+        requestOptions.body = JSON.stringify(body)
+      }
+    }
 
     try {
-      const response = await fetch(url, config);
+      const response = await fetch(url.toString(), requestOptions)
+
+      // Handle different response types
+      let data
+      const contentType = response.headers.get('content-type')
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new ApiError({
-          message: errorData.error || errorData.message || 'خطا در ارتباط با سرور',
-          errors: errorData.errors,
-          status: response.status,
-        });
+      if (contentType?.includes('application/json')) {
+        data = await response.json()
+      } else {
+        data = await response.text()
       }
 
-      // Handle empty responses
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        return response.json();
+      if (!response.ok) {
+        throw new ApiError(
+          data?.message || data?.detail || `HTTP Error: ${response.status}`,
+          response.status,
+          data
+        )
       }
-      
-      return {} as T;
+
+      return data
     } catch (error) {
       if (error instanceof ApiError) {
-        throw error;
+        throw error
       }
       
-      throw new ApiError({
-        message: 'خطا در ارتباط با سرور',
-        status: 0,
-      });
+      // Handle network errors
+      throw new ApiError(
+        'شبکه در دسترس نیست',
+        0,
+        { originalError: error }
+      )
     }
   }
 
-  // Authentication methods
-  async sendOTP(phone: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/auth/send-otp/', {
-      method: 'POST',
-      body: JSON.stringify({ phone }),
-    });
+  // GET request
+  async get<T = any>(endpoint: string, params?: Record<string, string>): Promise<T> {
+    return this.request<T>(endpoint, { method: 'GET', params })
   }
 
-  async verifyOTP(phone: string, code: string): Promise<{
-    access: string;
-    refresh: string;
-    user: User;
-    message: string;
-  }> {
-    const result = await this.request<{
-      access: string;
-      refresh: string;
-      user: User;
-      message: string;
-    }>('/auth/verify-otp/', {
-      method: 'POST',
-      body: JSON.stringify({ phone, code }),
-    });
-
-    // Store tokens
-    this.token = result.access;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('access_token', result.access);
-      localStorage.setItem('refresh_token', result.refresh);
-    }
-
-    return result;
+  // POST request
+  async post<T = any>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, { method: 'POST', body })
   }
 
-  async refreshToken(): Promise<{ access: string }> {
-    const refreshToken = typeof window !== 'undefined' 
-      ? localStorage.getItem('refresh_token') 
-      : null;
-    
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
-    const result = await this.request<{ access: string }>('/auth/refresh/', {
-      method: 'POST',
-      body: JSON.stringify({ refresh: refreshToken }),
-    });
-
-    this.token = result.access;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('access_token', result.access);
-    }
-
-    return result;
+  // PUT request
+  async put<T = any>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, { method: 'PUT', body })
   }
 
-  async logout(): Promise<void> {
-    const refreshToken = typeof window !== 'undefined' 
-      ? localStorage.getItem('refresh_token') 
-      : null;
-
-    if (refreshToken) {
-      await this.request('/auth/logout/', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-    }
-
-    this.token = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-    }
+  // PATCH request
+  async patch<T = any>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, { method: 'PATCH', body })
   }
 
-  async getProfile(): Promise<{ user: User }> {
-    return this.request<{ user: User }>('/profile/');
+  // DELETE request
+  async delete<T = any>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, { method: 'DELETE' })
   }
 
-  async updateProfile(data: Partial<User>): Promise<{ user: User }> {
-    return this.request<{ user: User }>('/profile/update/', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  // Store methods
-  async getStores(): Promise<Store[]> {
-    const result = await this.request<{ results: Store[] }>('/stores/');
-    return result.results;
-  }
-
-  async getStore(storeId: string): Promise<Store> {
-    return this.request<Store>(`/stores/${storeId}/`);
-  }
-
-  async createStore(storeData: Partial<Store>): Promise<Store> {
-    return this.request<Store>('/stores/', {
-      method: 'POST',
-      body: JSON.stringify(storeData),
-    });
-  }
-
-  async updateStore(storeId: string, storeData: Partial<Store>): Promise<Store> {
-    return this.request<Store>(`/stores/${storeId}/`, {
-      method: 'PUT',
-      body: JSON.stringify(storeData),
-    });
-  }
-
-  // Product methods
-  async getProducts(storeId?: string, filters?: any): Promise<{
-    results: Product[];
-    count: number;
-    next?: string;
-    previous?: string;
-  }> {
-    const params = new URLSearchParams(filters).toString();
-    const endpoint = storeId 
-      ? `/stores/${storeId}/products/?${params}`
-      : `/products/?${params}`;
-    
-    return this.request<{
-      results: Product[];
-      count: number;
-      next?: string;
-      previous?: string;
-    }>(endpoint);
-  }
-
-  async getProduct(productId: string, storeId?: string): Promise<Product> {
-    const endpoint = storeId 
-      ? `/stores/${storeId}/products/${productId}/`
-      : `/products/${productId}/`;
-    
-    return this.request<Product>(endpoint);
-  }
-
-  async createProduct(storeId: string, productData: any): Promise<Product> {
-    return this.request<Product>(`/stores/${storeId}/products/`, {
-      method: 'POST',
-      body: JSON.stringify(productData),
-    });
-  }
-
-  async createBulkProducts(storeId: string, productsData: any[]): Promise<Product[]> {
-    return this.request<Product[]>(`/stores/${storeId}/products/bulk/`, {
-      method: 'POST',
-      body: JSON.stringify({ products: productsData }),
-    });
-  }
-
-  async updateProduct(storeId: string, productId: string, productData: any): Promise<Product> {
-    return this.request<Product>(`/stores/${storeId}/products/${productId}/`, {
-      method: 'PUT',
-      body: JSON.stringify(productData),
-    });
-  }
-
-  async deleteProduct(storeId: string, productId: string): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/products/${productId}/`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Category methods
-  async getCategories(storeId?: string): Promise<Category[]> {
-    const endpoint = storeId 
-      ? `/stores/${storeId}/categories/`
-      : `/categories/`;
-    
-    const result = await this.request<{ results: Category[] }>(endpoint);
-    return result.results;
-  }
-
-  async getCategory(categoryId: string, storeId?: string): Promise<Category> {
-    const endpoint = storeId 
-      ? `/stores/${storeId}/categories/${categoryId}/`
-      : `/categories/${categoryId}/`;
-    
-    return this.request<Category>(endpoint);
-  }
-
-  async createCategory(storeId: string, categoryData: any): Promise<Category> {
-    return this.request<Category>(`/stores/${storeId}/categories/`, {
-      method: 'POST',
-      body: JSON.stringify(categoryData),
-    });
-  }
-
-  // Brand methods
-  async getBrands(storeId?: string): Promise<Brand[]> {
-    const endpoint = storeId 
-      ? `/stores/${storeId}/brands/`
-      : `/brands/`;
-    
-    const result = await this.request<{ results: Brand[] }>(endpoint);
-    return result.results;
-  }
-
-  // Cart methods
-  async getCart(storeId: string): Promise<Cart> {
-    return this.request<Cart>(`/stores/${storeId}/cart/`);
-  }
-
-  async addToCart(storeId: string, productId: string, variantId?: string, quantity: number = 1): Promise<Cart> {
-    return this.request<Cart>(`/stores/${storeId}/cart/add/`, {
-      method: 'POST',
-      body: JSON.stringify({
-        product_id: productId,
-        variant_id: variantId,
-        quantity,
-      }),
-    });
-  }
-
-  async updateCartItem(storeId: string, itemId: string, quantity: number): Promise<Cart> {
-    return this.request<Cart>(`/stores/${storeId}/cart/items/${itemId}/`, {
-      method: 'PUT',
-      body: JSON.stringify({ quantity }),
-    });
-  }
-
-  async removeCartItem(storeId: string, itemId: string): Promise<Cart> {
-    return this.request<Cart>(`/stores/${storeId}/cart/items/${itemId}/`, {
-      method: 'DELETE',
-    });
-  }
-
-  async clearCart(storeId: string): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/cart/clear/`, {
-      method: 'POST',
-    });
-  }
-
-  // Order methods
-  async createOrder(storeId: string, orderData: any): Promise<any> {
-    return this.request<any>(`/stores/${storeId}/orders/`, {
-      method: 'POST',
-      body: JSON.stringify(orderData),
-    });
-  }
-
-  async getOrders(storeId?: string, filters?: any): Promise<any[]> {
-    const params = new URLSearchParams(filters).toString();
-    const endpoint = storeId 
-      ? `/stores/${storeId}/orders/?${params}`
-      : `/orders/?${params}`;
-    
-    const result = await this.request<{ results: any[] }>(endpoint);
-    return result.results;
-  }
-
-  async getOrder(orderId: string, storeId?: string): Promise<any> {
-    const endpoint = storeId 
-      ? `/stores/${storeId}/orders/${orderId}/`
-      : `/orders/${orderId}/`;
-    
-    return this.request<any>(endpoint);
-  }
-
-  // Payment methods
-  async createPayment(storeId: string, orderId: string, paymentData: any): Promise<any> {
-    return this.request<any>(`/stores/${storeId}/orders/${orderId}/payment/`, {
-      method: 'POST',
-      body: JSON.stringify(paymentData),
-    });
-  }
-
-  async verifyPayment(storeId: string, transactionId: string, verificationData: any): Promise<any> {
-    return this.request<any>(`/stores/${storeId}/payments/${transactionId}/verify/`, {
-      method: 'POST',
-      body: JSON.stringify(verificationData),
-    });
-  }
-
-  // Social Media methods
-  async getSocialMediaPosts(storeId: string): Promise<any[]> {
-    const result = await this.request<{ results: any[] }>(`/stores/${storeId}/social-media/posts/`);
-    return result.results;
-  }
-
-  async importSocialMediaPost(storeId: string, postId: string, categoryId: string, additionalData?: any): Promise<Product> {
-    return this.request<Product>(`/stores/${storeId}/social-media/import/`, {
-      method: 'POST',
-      body: JSON.stringify({
-        social_media_post_id: postId,
-        category_id: categoryId,
-        additional_data: additionalData,
-      }),
-    });
-  }
-
-  async connectSocialMediaAccount(storeId: string, platform: string, accountData: any): Promise<any> {
-    return this.request<any>(`/stores/${storeId}/social-media/connect/`, {
-      method: 'POST',
-      body: JSON.stringify({
-        platform,
-        ...accountData,
-      }),
-    });
-  }
-
-  // File upload helper
-  async uploadFile(endpoint: string, file: File, additionalData?: Record<string, any>): Promise<any> {
-    const formData = new FormData();
-    formData.append('file', file);
+  // Upload file
+  async upload<T = any>(endpoint: string, file: File, additionalData?: Record<string, any>): Promise<T> {
+    const formData = new FormData()
+    formData.append('file', file)
     
     if (additionalData) {
-      Object.keys(additionalData).forEach(key => {
-        formData.append(key, additionalData[key]);
-      });
+      Object.entries(additionalData).forEach(([key, value]) => {
+        formData.append(key, value.toString())
+      })
     }
 
-    return this.request<any>(endpoint, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        // Remove Content-Type header to let browser set boundary for FormData
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
-      },
-    });
+    return this.request<T>(endpoint, { method: 'POST', body: formData })
   }
 
-  // Analytics methods
-  async getStoreAnalytics(storeId: string, period?: string): Promise<any> {
-    const params = period ? `?period=${period}` : '';
-    return this.request<any>(`/stores/${storeId}/analytics/${params}`);
+  // Set auth token
+  setAuthToken(token: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_token', token)
+    }
   }
 
-  async getProductAnalytics(storeId: string, productId: string): Promise<any> {
-    return this.request<any>(`/stores/${storeId}/products/${productId}/analytics/`);
+  // Clear auth token
+  clearAuthToken() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token')
+    }
   }
-}
 
-// Create ApiError class
-class ApiError extends Error {
-  public status: number;
-  public errors?: Record<string, string[]>;
-
-  constructor({ message, status, errors }: { message: string; status: number; errors?: Record<string, string[]> }) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.errors = errors;
+  // Get current auth token
+  getAuthToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('auth_token')
+    }
+    return null
   }
 }
 
-// Export singleton instance
-export const apiClient = new ApiClient(API_BASE_URL);
+// Create singleton instance
+const apiClient = new ApiClient()
 
-// Export class for creating custom instances
-export { ApiClient, ApiError };
+// Export types and client
+export { ApiClient, ApiError, type RequestConfig }
+export default apiClient
 
-// Helper function to handle API errors
-export const handleApiError = (error: unknown): string => {
-  if (error instanceof ApiError) {
-    return error.message;
+// API Service Classes
+export class AuthService {
+  static async login(phone: string, password: string) {
+    return apiClient.post('/auth/login/', { phone, password })
   }
-  
-  if (error instanceof Error) {
-    return error.message;
+
+  static async register(userData: {
+    phone: string
+    first_name: string
+    last_name: string
+    password: string
+  }) {
+    return apiClient.post('/auth/register/', userData)
   }
-  
-  return 'خطای ناشناخته';
-};
 
-// Helper function to format Iranian currency
-export const formatPrice = (price: number): string => {
-  return new Intl.NumberFormat('fa-IR').format(price) + ' تومان';
-};
+  static async sendOTP(phone: string) {
+    return apiClient.post('/auth/send-otp/', { phone })
+  }
 
-// Helper function to format dates in Persian
-export const formatDate = (date: string | Date): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('fa-IR').format(dateObj);
-};
+  static async verifyOTP(phone: string, otp: string) {
+    return apiClient.post('/auth/verify-otp/', { phone, otp })
+  }
+
+  static async logout() {
+    const result = await apiClient.post('/auth/logout/')
+    apiClient.clearAuthToken()
+    return result
+  }
+
+  static async getProfile() {
+    return apiClient.get('/auth/profile/')
+  }
+
+  static async updateProfile(data: any) {
+    return apiClient.put('/auth/profile/', data)
+  }
+}
+
+export class StoreService {
+  static async getStores(params?: Record<string, string>) {
+    return apiClient.get('/stores/', params)
+  }
+
+  static async getStore(id: string) {
+    return apiClient.get(`/stores/${id}/`)
+  }
+
+  static async createStore(data: any) {
+    return apiClient.post('/stores/', data)
+  }
+
+  static async updateStore(id: string, data: any) {
+    return apiClient.put(`/stores/${id}/`, data)
+  }
+
+  static async deleteStore(id: string) {
+    return apiClient.delete(`/stores/${id}/`)
+  }
+
+  static async getStoreAnalytics(id: string, params?: Record<string, string>) {
+    return apiClient.get(`/stores/${id}/analytics/`, params)
+  }
+}
+
+export class ProductService {
+  static async getProducts(storeId?: string, params?: Record<string, string>) {
+    const endpoint = storeId ? `/stores/${storeId}/products/` : '/products/'
+    return apiClient.get(endpoint, params)
+  }
+
+  static async getProduct(id: string) {
+    return apiClient.get(`/products/${id}/`)
+  }
+
+  static async createProduct(data: any) {
+    return apiClient.post('/products/', data)
+  }
+
+  static async updateProduct(id: string, data: any) {
+    return apiClient.put(`/products/${id}/`, data)
+  }
+
+  static async deleteProduct(id: string) {
+    return apiClient.delete(`/products/${id}/`)
+  }
+
+  static async uploadProductImage(productId: string, file: File) {
+    return apiClient.upload(`/products/${productId}/images/`, file)
+  }
+
+  static async getCategories(storeId: string) {
+    return apiClient.get(`/stores/${storeId}/categories/`)
+  }
+
+  static async createCategory(storeId: string, data: any) {
+    return apiClient.post(`/stores/${storeId}/categories/`, data)
+  }
+
+  static async getBrands(storeId: string) {
+    return apiClient.get(`/stores/${storeId}/brands/`)
+  }
+
+  static async createBrand(storeId: string, data: any) {
+    return apiClient.post(`/stores/${storeId}/brands/`, data)
+  }
+}
+
+export class OrderService {
+  static async getOrders(storeId?: string, params?: Record<string, string>) {
+    const endpoint = storeId ? `/stores/${storeId}/orders/` : '/orders/'
+    return apiClient.get(endpoint, params)
+  }
+
+  static async getOrder(id: string) {
+    return apiClient.get(`/orders/${id}/`)
+  }
+
+  static async createOrder(data: any) {
+    return apiClient.post('/orders/', data)
+  }
+
+  static async updateOrderStatus(id: string, status: string, notes?: string) {
+    return apiClient.patch(`/orders/${id}/`, { status, notes })
+  }
+
+  static async getCart(storeId: string) {
+    return apiClient.get(`/stores/${storeId}/cart/`)
+  }
+
+  static async addToCart(storeId: string, productId: string, quantity: number, variantId?: string) {
+    return apiClient.post(`/stores/${storeId}/cart/items/`, {
+      product_id: productId,
+      variant_id: variantId,
+      quantity
+    })
+  }
+
+  static async updateCartItem(storeId: string, itemId: string, quantity: number) {
+    return apiClient.patch(`/stores/${storeId}/cart/items/${itemId}/`, { quantity })
+  }
+
+  static async removeFromCart(storeId: string, itemId: string) {
+    return apiClient.delete(`/stores/${storeId}/cart/items/${itemId}/`)
+  }
+
+  static async clearCart(storeId: string) {
+    return apiClient.delete(`/stores/${storeId}/cart/`)
+  }
+}
+
+export class PaymentService {
+  static async createPayment(orderId: string, gateway: string = 'zarinpal') {
+    return apiClient.post('/payments/', {
+      order_id: orderId,
+      gateway
+    })
+  }
+
+  static async verifyPayment(paymentId: string, authority?: string) {
+    return apiClient.post(`/payments/${paymentId}/verify/`, { authority })
+  }
+
+  static async getPaymentMethods(storeId: string) {
+    return apiClient.get(`/stores/${storeId}/payment-methods/`)
+  }
+
+  static async getPaymentHistory(params?: Record<string, string>) {
+    return apiClient.get('/payments/', params)
+  }
+}
