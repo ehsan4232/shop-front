@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import { Providers } from './providers'
+import { RTLProvider } from '../components/ui/rtl-provider'
 
 // Persian fonts for better RTL support
 const vazirFont = localFont({
@@ -75,9 +76,11 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" className={vazirFont.variable}>
       <body className="font-vazir antialiased">
-        <Providers>
-          {children}
-        </Providers>
+        <RTLProvider locale="fa">
+          <Providers>
+            {children}
+          </Providers>
+        </RTLProvider>
       </body>
     </html>
   )
