@@ -101,7 +101,64 @@ export interface StoreSetting extends BaseModel {
   description?: string
 }
 
-// Product types
+// NEW: Attribute Types
+export interface AttributeType extends BaseModel {
+  name: string
+  name_fa: string
+  slug: string
+  data_type: 'text' | 'color' | 'size' | 'number' | 'choice' | 'boolean' | 'date'
+  is_required: boolean
+  is_filterable: boolean
+  display_order: number
+}
+
+// NEW: Product Tags
+export interface Tag extends BaseModel {
+  store: string
+  name: string
+  name_fa: string
+  slug: string
+  description?: string
+  tag_type: 'general' | 'feature' | 'category' | 'promotion' | 'season'
+  color: string
+  is_featured: boolean
+  is_filterable: boolean
+  usage_count: number
+}
+
+// NEW: Product Class (Object-Oriented Hierarchy)
+export interface ProductClass extends BaseModel {
+  store: string
+  name: string
+  name_fa: string
+  slug: string
+  description?: string
+  parent?: string
+  parent_name?: string
+  base_price?: number
+  effective_price: number
+  icon?: string
+  image?: string
+  display_order: number
+  is_active: boolean
+  is_leaf: boolean
+  product_count: number
+  children?: ProductClass[]
+  attributes: ProductClassAttribute[]
+  inherited_attributes: ProductClassAttribute[]
+}
+
+// NEW: Product Class Attributes
+export interface ProductClassAttribute extends BaseModel {
+  product_class: string
+  attribute_type: AttributeType
+  default_value?: string
+  is_required: boolean
+  is_inherited: boolean
+  display_order: number
+}
+
+// Product types - UPDATED
 export interface ProductCategory extends BaseModel {
   store: string
   name: string
@@ -119,6 +176,7 @@ export interface ProductCategory extends BaseModel {
   lft: number
   rght: number
   tree_id: number
+  attributes: ProductAttribute[]
 }
 
 export interface Brand extends BaseModel {
@@ -132,22 +190,43 @@ export interface Brand extends BaseModel {
   product_count: number
 }
 
-export interface ProductAttribute {
-  name: string
-  attribute_type: 'text' | 'color' | 'size' | 'number' | 'choice'
-  values: string[]
+export interface ProductAttribute extends BaseModel {
+  category: string
+  attribute_type: AttributeType
+  is_required: boolean
+  default_value?: string
+  display_order: number
 }
 
+export interface ProductAttributeValue extends BaseModel {
+  product?: string
+  variant?: string
+  attribute: ProductAttribute
+  attribute_name: string
+  attribute_type: string
+  value_text?: string
+  value_number?: number
+  value_boolean?: boolean
+  value_date?: string
+  display_value: string
+}
+
+// UPDATED: Product with new structure
 export interface Product extends BaseModel {
   store: string
+  product_class: string
+  product_class_name: string
   category: string
   brand?: string
+  tags: string[]
   name: string
   name_fa: string
   slug: string
   description?: string
   short_description?: string
-  price: number
+  product_type: 'simple' | 'variable' | 'grouped' | 'external'
+  base_price?: number
+  effective_price: number
   compare_price?: number
   cost_price?: number
   sku?: string
@@ -162,6 +241,8 @@ export interface Product extends BaseModel {
   is_featured: boolean
   view_count: number
   sales_count: number
+  rating_average: number
+  rating_count: number
   imported_from_social: boolean
   social_media_source?: 'telegram' | 'instagram'
   social_media_post_id?: string
@@ -175,8 +256,12 @@ export interface Product extends BaseModel {
   // Related data
   images?: ProductImage[]
   variants?: ProductVariant[]
+  attribute_values?: ProductAttributeValue[]
+  inherited_attributes?: ProductClassAttribute[]
   category_data?: ProductCategory
   brand_data?: Brand
+  product_class_data?: ProductClass
+  tags_data?: Tag[]
 }
 
 export interface ProductVariant extends BaseModel {
@@ -186,13 +271,17 @@ export interface ProductVariant extends BaseModel {
   compare_price?: number
   stock_quantity: number
   image?: string
-  attributes: Record<string, any>
+  attribute_values: ProductAttributeValue[]
+  attribute_summary: string
   is_active: boolean
   is_default: boolean
   
   // Computed properties
   in_stock: boolean
   discount_percentage: number
+  
+  // Related data
+  images?: ProductImage[]
 }
 
 export interface ProductImage extends BaseModel {
@@ -217,9 +306,10 @@ export interface Collection extends BaseModel {
   display_order: number
   is_active: boolean
   products: string[]
+  products_count: number
 }
 
-// Order types
+// Order types - UPDATED
 export interface Cart extends BaseModel {
   user?: string
   store: string
@@ -427,9 +517,12 @@ export interface UserNotification extends BaseModel {
   read_at?: string
 }
 
-// Analytics types
+// Analytics types - UPDATED
 export interface StoreAnalytics {
   total_products: number
+  total_product_classes: number
+  total_categories: number
+  total_brands: number
   total_orders: number
   total_customers: number
   total_revenue: number
@@ -499,7 +592,7 @@ export interface ApiResponse<T = any> {
   errors?: Record<string, string[]>
 }
 
-// Form types
+// Form types - UPDATED
 export interface LoginForm {
   phone: string
   password: string
@@ -531,14 +624,18 @@ export interface StoreForm {
   postal_code?: string
 }
 
+// UPDATED: Product form with new fields
 export interface ProductForm {
   name: string
   name_fa: string
+  product_class: string  // Required now
   category: string
   brand?: string
+  tags?: string[]
   description?: string
   short_description?: string
-  price: number
+  product_type: 'simple' | 'variable' | 'grouped' | 'external'
+  base_price?: number  // Optional now (can inherit)
   compare_price?: number
   stock_quantity: number
   sku?: string
@@ -559,16 +656,21 @@ export interface OrderForm {
   notes?: string
 }
 
-// Filter types
+// Filter types - UPDATED
 export interface ProductFilters {
+  product_class?: string  // NEW
   category?: string
   brand?: string
+  tags?: string[]  // NEW
   min_price?: number
   max_price?: number
   in_stock?: boolean
   is_featured?: boolean
   search?: string
   sort?: 'created_at' | '-created_at' | 'price' | '-price' | 'name' | '-name' | 'sales_count' | '-sales_count'
+  
+  // Dynamic attribute filters
+  [key: `attr_${string}`]: string | string[]
 }
 
 export interface OrderFilters {
@@ -634,4 +736,43 @@ export interface MetricCard {
   change?: number
   changeType?: 'increase' | 'decrease' | 'neutral'
   icon?: string
+}
+
+// NEW: Product class hierarchy specific types
+export interface ProductClassHierarchy {
+  id: string
+  name: string
+  name_fa: string
+  slug: string
+  level: number
+  children: ProductClassHierarchy[]
+  product_count: number
+  is_leaf: boolean
+  effective_price?: number
+}
+
+export interface AttributeInheritance {
+  attribute_type: AttributeType
+  inherited_from: string
+  inherited_from_name: string
+  can_override: boolean
+  current_value?: string
+  inherited_value?: string
+}
+
+// NEW: Social media import types
+export interface SocialMediaImportForm {
+  social_media_post_id: string
+  product_class_id: string
+  category_id: string
+  additional_data?: Record<string, any>
+}
+
+export interface SocialMediaImportPreview {
+  post_content?: string
+  extracted_images: string[]
+  extracted_videos: string[]
+  suggested_name?: string
+  suggested_description?: string
+  suggested_price?: number
 }
