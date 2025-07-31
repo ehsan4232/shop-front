@@ -1,221 +1,238 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { HexColorPicker } from 'react-colorful';
-import { Palette, X } from 'lucide-react';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
-  label?: string;
-  placeholder?: string;
+  label: string;
+  description?: string;
+  required?: boolean;
   disabled?: boolean;
   className?: string;
 }
 
-export const ColorPicker: React.FC<ColorPickerProps> = ({
+// Persian color names for common colors
+const PRESET_COLORS = [
+  { hex: '#FF0000', name: 'قرمز' },
+  { hex: '#00FF00', name: 'سبز' },
+  { hex: '#0000FF', name: 'آبی' },
+  { hex: '#FFFF00', name: 'زرد' },
+  { hex: '#FF00FF', name: 'بنفش' },
+  { hex: '#00FFFF', name: 'فیروزه‌ای' },
+  { hex: '#FFA500', name: 'نارنجی' },
+  { hex: '#800080', name: 'ارغوانی' },
+  { hex: '#FFC0CB', name: 'صورتی' },
+  { hex: '#A52A2A', name: 'قهوه‌ای' },
+  { hex: '#808080', name: 'خاکستری' },
+  { hex: '#000000', name: 'مشکی' },
+  { hex: '#FFFFFF', name: 'سفید' },
+  { hex: '#8B4513', name: 'قهوه‌ای تیره' },
+  { hex: '#4B0082', name: 'نیلی' },
+  { hex: '#DC143C', name: 'قرمز کرمزی' },
+];
+
+const ColorPicker: React.FC<ColorPickerProps> = ({
   value = '#000000',
   onChange,
   label,
-  placeholder = '#000000',
+  description,
+  required = false,
   disabled = false,
-  className = ''
+  className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [tempValue, setTempValue] = useState(value);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [customColor, setCustomColor] = useState(value);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
 
-  // Close popover when clicking outside
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        // Apply the temporary value when closing
-        if (tempValue !== value) {
-          onChange(tempValue);
-        }
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen, tempValue, value, onChange]);
-
-  // Update temp value when prop value changes
+  // Update custom color when value changes
   useEffect(() => {
-    setTempValue(value);
+    setCustomColor(value);
   }, [value]);
 
-  const handleColorChange = (newColor: string) => {
-    setTempValue(newColor);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setTempValue(newValue);
-    
-    // Validate hex color format
-    if (/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(newValue)) {
-      onChange(newValue);
-    }
-  };
-
-  const handleInputBlur = () => {
-    // Ensure valid hex format when input loses focus
-    if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(tempValue)) {
-      setTempValue(value);
-    } else {
-      onChange(tempValue);
-    }
-  };
-
-  const handleColorSquareClick = () => {
-    if (!disabled) {
-      setIsOpen(!isOpen);
-    }
-  };
-
-  const handleApplyColor = () => {
-    onChange(tempValue);
+  const handlePresetColorClick = (color: string) => {
+    onChange(color);
+    setCustomColor(color);
     setIsOpen(false);
   };
 
-  const handleCancelColor = () => {
-    setTempValue(value);
-    setIsOpen(false);
+  const handleCustomColorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newColor = event.target.value;
+    setCustomColor(newColor);
+    onChange(newColor);
   };
 
-  const isValidColor = (color: string) => {
-    return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
+  const getColorName = (hex: string): string => {
+    const preset = PRESET_COLORS.find(color => 
+      color.hex.toLowerCase() === hex.toLowerCase()
+    );
+    return preset ? preset.name : hex.toUpperCase();
+  };
+
+  const isValidHex = (hex: string): boolean => {
+    return /^#[0-9A-F]{6}$/i.test(hex);
   };
 
   return (
     <div className={`relative ${className}`}>
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {label}
-        </label>
-      )}
-      
-      <div className="flex items-center gap-2">
-        {/* Color Preview Square */}
-        <button
-          type="button"
-          onClick={handleColorSquareClick}
-          disabled={disabled}
-          className={`
-            w-10 h-10 rounded-md border-2 border-gray-300 shadow-sm transition-all duration-200
-            ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-gray-400 hover:shadow-md'}
-            ${isOpen ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}
-          `}
-          style={{ 
-            backgroundColor: isValidColor(tempValue) ? tempValue : '#ffffff',
-            backgroundImage: !isValidColor(tempValue) ? 
-              'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 8px 8px' : 'none'
-          }}
-          title={isValidColor(tempValue) ? tempValue : 'رنگ نامعتبر'}
-        >
-          {!isValidColor(tempValue) && (
-            <Palette className="w-5 h-5 text-gray-500 mx-auto" />
-          )}
-        </button>
+      {/* Label */}
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {label}
+        {required && <span className="text-red-500 mr-1">*</span>}
+      </label>
 
-        {/* Hex Input */}
-        <div className="flex-1">
-          <input
-            ref={inputRef}
-            type="text"
-            value={tempValue}
-            onChange={handleInputChange}
-            onBlur={handleInputBlur}
-            placeholder={placeholder}
-            disabled={disabled}
-            className={`
-              w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm
-              focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-              ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
-              ${!isValidColor(tempValue) && tempValue ? 'border-red-300 text-red-600' : ''}
-            `}
-            dir="ltr"
-          />
-          {!isValidColor(tempValue) && tempValue && (
-            <p className="text-xs text-red-600 mt-1">فرمت رنگ نامعتبر است</p>
-          )}
+      {/* Main Color Display & Trigger */}
+      <div
+        className={`
+          relative flex items-center justify-between w-full px-3 py-2 
+          border border-gray-300 rounded-md shadow-sm cursor-pointer
+          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+          ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:border-gray-400'}
+          ${!isValidHex(value) ? 'border-red-300' : ''}
+        `}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        {/* Color Preview Square */}
+        <div className="flex items-center space-x-3">
+          <div
+            className="w-8 h-8 rounded-md border-2 border-gray-300 shadow-sm flex-shrink-0"
+            style={{ backgroundColor: isValidHex(value) ? value : '#CCCCCC' }}
+          >
+            {!isValidHex(value) && (
+              <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">
+                ؟
+              </div>
+            )}
+          </div>
+          
+          {/* Color Information */}
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-900">
+              {getColorName(value)}
+            </span>
+            <span className="text-xs text-gray-500">
+              {value.toUpperCase()}
+            </span>
+          </div>
         </div>
+
+        {/* Dropdown Arrow */}
+        <ChevronDownIcon 
+          className={`w-5 h-5 text-gray-400 transform transition-transform ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+        />
       </div>
 
-      {/* Color Picker Popover */}
+      {/* Description */}
+      {description && (
+        <p className="mt-1 text-xs text-gray-500">{description}</p>
+      )}
+
+      {/* Validation Error */}
+      {!isValidHex(value) && (
+        <p className="mt-1 text-xs text-red-600">
+          لطفاً کد رنگ معتبر وارد کنید (مثال: #FF0000)
+        </p>
+      )}
+
+      {/* Dropdown Panel */}
       {isOpen && !disabled && (
-        <div 
-          ref={popoverRef}
-          className="absolute z-50 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg p-4"
-          style={{ minWidth: '280px' }}
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-y-auto"
         >
-          {/* Color Picker */}
-          <div className="mb-4">
-            <HexColorPicker 
-              color={tempValue} 
-              onChange={handleColorChange}
-              style={{ width: '100%', height: '200px' }}
-            />
+          {/* Custom Color Input */}
+          <div className="p-3 border-b border-gray-200">
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              رنگ سفارشی:
+            </label>
+            <div className="flex space-x-2">
+              <input
+                ref={colorInputRef}
+                type="color"
+                value={customColor}
+                onChange={handleCustomColorChange}
+                className="w-10 h-8 border border-gray-300 rounded cursor-pointer"
+              />
+              <input
+                type="text"
+                value={customColor}
+                onChange={(e) => {
+                  setCustomColor(e.target.value);
+                  if (isValidHex(e.target.value)) {
+                    onChange(e.target.value);
+                  }
+                }}
+                placeholder="#FF0000"
+                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                dir="ltr"
+              />
+            </div>
           </div>
 
-          {/* Preset Colors */}
-          <div className="mb-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">رنگ‌های پیش‌فرض</p>
-            <div className="grid grid-cols-8 gap-2">
-              {[
-                '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff',
-                '#800000', '#808080', '#800080', '#008000', '#000080', '#808000', '#ff8000', '#ff0080'
-              ].map((presetColor) => (
+          {/* Preset Colors Grid */}
+          <div className="p-3">
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              رنگ‌های پیش‌فرض:
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {PRESET_COLORS.map((color) => (
                 <button
-                  key={presetColor}
+                  key={color.hex}
                   type="button"
-                  onClick={() => handleColorChange(presetColor)}
+                  onClick={() => handlePresetColorClick(color.hex)}
                   className={`
-                    w-8 h-8 rounded border-2 hover:scale-110 transition-transform duration-200
-                    ${tempValue.toLowerCase() === presetColor.toLowerCase() ? 'border-blue-500' : 'border-gray-300'}
+                    group relative p-2 rounded-md border-2 transition-all duration-200
+                    hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500
+                    ${value.toLowerCase() === color.hex.toLowerCase() 
+                      ? 'border-blue-500 shadow-md' 
+                      : 'border-gray-200 hover:border-gray-300'
+                    }
                   `}
-                  style={{ backgroundColor: presetColor }}
-                  title={presetColor}
-                />
+                  title={`${color.name} (${color.hex})`}
+                >
+                  {/* Color Square */}
+                  <div
+                    className="w-full h-8 rounded-sm shadow-sm"
+                    style={{ backgroundColor: color.hex }}
+                  />
+                  
+                  {/* Color Name */}
+                  <div className="mt-1 text-xs text-center text-gray-600 group-hover:text-gray-800">
+                    {color.name}
+                  </div>
+                  
+                  {/* Selected Indicator */}
+                  {value.toLowerCase() === color.hex.toLowerCase() && (
+                    <div className="absolute top-1 right-1 w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                    </div>
+                  )}
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Current Selection Display */}
-          <div className="mb-4 p-2 bg-gray-50 rounded">
-            <div className="flex items-center gap-2">
-              <div 
-                className="w-6 h-6 rounded border border-gray-300"
-                style={{ backgroundColor: tempValue }}
-              />
-              <span className="text-sm font-mono text-gray-700">{tempValue}</span>
+          {/* Recent Colors (if you want to add this feature) */}
+          <div className="p-3 border-t border-gray-200 bg-gray-50">
+            <div className="text-xs text-gray-500 text-center">
+              رنگ انتخاب شده: <span className="font-mono">{value.toUpperCase()}</span>
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={handleCancelColor}
-              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              لغو
-            </button>
-            <button
-              type="button"
-              onClick={handleApplyColor}
-              className="px-4 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-            >
-              اعمال
-            </button>
           </div>
         </div>
       )}
