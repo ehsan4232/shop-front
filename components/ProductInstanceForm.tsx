@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { ColorPicker } from './ui/ColorPicker';
+import { Instagram, Send } from 'lucide-react';
 
 interface ProductInstanceFormProps {
   productClass: any;
@@ -11,10 +13,17 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
   onSubmit 
 }) => {
   const [createAnother, setCreateAnother] = useState(false);
+  const [attributes, setAttributes] = useState<{[key: string]: any}>({});
   const { register, handleSubmit, formState: { errors }, reset } = useForm();
 
   const handleFormSubmit = (data: any) => {
-    onSubmit(data, createAnother);
+    // Merge form data with attributes
+    const completeData = {
+      ...data,
+      attributes
+    };
+    
+    onSubmit(completeData, createAnother);
     
     // If creating another instance, reset form but keep some values
     if (createAnother) {
@@ -25,6 +34,32 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
         // Keep other common fields
       };
       reset(preservedValues);
+      // Keep non-instance-specific attributes
+      const preservedAttributes = {};
+      Object.keys(attributes).forEach(key => {
+        const attr = productClass.attributes?.find(a => a.id.toString() === key);
+        if (attr && !attr.is_instance_specific) {
+          preservedAttributes[key] = attributes[key];
+        }
+      });
+      setAttributes(preservedAttributes);
+    }
+  };
+
+  const handleAttributeChange = (attributeId: string, value: any) => {
+    setAttributes(prev => ({
+      ...prev,
+      [attributeId]: value
+    }));
+  };
+
+  const handleSocialMediaImport = async (platform: 'instagram' | 'telegram') => {
+    try {
+      // This would call the social media API
+      console.log(`Importing from ${platform}...`);
+      // Implementation would be added based on backend API
+    } catch (error) {
+      console.error(`Error importing from ${platform}:`, error);
     }
   };
 
@@ -139,43 +174,87 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
             <div className="flex justify-center space-x-4 space-x-reverse">
               <button
                 type="button"
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                onClick={() => handleSocialMediaImport('telegram')}
+                className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
               >
-                📱 دریافت از تلگرام
+                <Send className="w-4 h-4 ml-2" />
+                دریافت از تلگرام
               </button>
               <button
                 type="button"
-                className="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600"
+                onClick={() => handleSocialMediaImport('instagram')}
+                className="flex items-center px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
               >
-                📷 دریافت از اینستاگرام
+                <Instagram className="w-4 h-4 ml-2" />
+                دریافت از اینستاگرام
               </button>
             </div>
           </div>
         </div>
 
-        {/* Color Attributes - Per Product Description */}
-        {productClass.attributes?.filter(attr => attr.data_type === 'color').map((colorAttr) => (
-          <div key={colorAttr.id} className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">
-              {colorAttr.name_fa}
-            </label>
-            <div className="flex items-center space-x-3 space-x-reverse">
-              <input
-                type="color"
-                {...register(`attributes.${colorAttr.id}.color_hex`)}
-                className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-              />
-              <input
-                type="text"
-                {...register(`attributes.${colorAttr.id}.value_text`)}
-                placeholder="نام رنگ"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+        {/* Product Attributes */}
+        {productClass.attributes && productClass.attributes.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900">ویژگی‌های محصول</h3>
+            {productClass.attributes.map((attr) => (
+              <div key={attr.id} className="space-y-2">
+                {attr.data_type === 'color' ? (
+                  // ENHANCED: Use ColorPicker component for color attributes
+                  <ColorPicker
+                    label={attr.name_fa + (attr.is_required ? ' *' : '')}
+                    value={attributes[attr.id] || attr.default_value || '#000000'}
+                    onChange={(color) => handleAttributeChange(attr.id, color)}
+                    className="w-full"
+                  />
+                ) : attr.data_type === 'number' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {attr.name_fa} {attr.is_required && '*'}
+                    </label>
+                    <input
+                      type="number"
+                      value={attributes[attr.id] || ''}
+                      onChange={(e) => handleAttributeChange(attr.id, e.target.value)}
+                      placeholder={attr.default_value}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      required={attr.is_required}
+                    />
+                  </div>
+                ) : attr.data_type === 'boolean' ? (
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`attr_${attr.id}`}
+                      checked={attributes[attr.id] || false}
+                      onChange={(e) => handleAttributeChange(attr.id, e.target.checked)}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor={`attr_${attr.id}`} className="mr-3 text-sm text-gray-700">
+                      {attr.name_fa} {attr.is_required && '*'}
+                    </label>
+                  </div>
+                ) : (
+                  // Default text input for other types
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {attr.name_fa} {attr.is_required && '*'}
+                    </label>
+                    <input
+                      type="text"
+                      value={attributes[attr.id] || ''}
+                      onChange={(e) => handleAttributeChange(attr.id, e.target.value)}
+                      placeholder={attr.default_value}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      required={attr.is_required}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
+        )}
 
-        {/* Create Another Instance Checkbox - Critical Feature */}
+        {/* Create Another Instance Checkbox - Critical Feature Per Product Description */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex items-center">
             <input
