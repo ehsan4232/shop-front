@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { ColorPicker } from './ui/ColorPicker';
-import { Instagram, Send } from 'lucide-react';
+import SocialMediaImport from './SocialMediaImport';
 
 interface ProductInstanceFormProps {
   productClass: any;
@@ -14,13 +14,15 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
 }) => {
   const [createAnother, setCreateAnother] = useState(false);
   const [attributes, setAttributes] = useState<{[key: string]: any}>({});
-  const { register, handleSubmit, formState: { errors }, reset } = useForm();
+  const [socialMediaData, setSocialMediaData] = useState<any>(null);
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
 
   const handleFormSubmit = (data: any) => {
-    // Merge form data with attributes
+    // Merge form data with attributes and social media data
     const completeData = {
       ...data,
-      attributes
+      attributes,
+      social_media_data: socialMediaData
     };
     
     onSubmit(completeData, createAnother);
@@ -43,6 +45,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
         }
       });
       setAttributes(preservedAttributes);
+      setSocialMediaData(null);
     }
   };
 
@@ -53,13 +56,31 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
     }));
   };
 
-  const handleSocialMediaImport = async (platform: 'instagram' | 'telegram') => {
-    try {
-      // This would call the social media API
-      console.log(`Importing from ${platform}...`);
-      // Implementation would be added based on backend API
-    } catch (error) {
-      console.error(`Error importing from ${platform}:`, error);
+  const handleSocialMediaImport = (importedData: any) => {
+    setSocialMediaData(importedData);
+    
+    // Auto-fill form fields with imported content
+    if (importedData.selectedTexts && importedData.selectedTexts.length > 0) {
+      // Use first text as description
+      const description = importedData.selectedTexts[0];
+      setValue('description', description);
+    }
+    
+    // If there are images, we could set them as product images
+    // This would require additional handling in the backend
+    if (importedData.selectedImages && importedData.selectedImages.length > 0) {
+      console.log('Imported images:', importedData.selectedImages);
+      // Could trigger image upload process here
+    }
+    
+    // Show success message
+    const totalImported = (importedData.selectedTexts?.length || 0) + 
+                         (importedData.selectedImages?.length || 0) + 
+                         (importedData.selectedVideos?.length || 0);
+    
+    if (totalImported > 0) {
+      // You could show a toast notification here
+      console.log(`${totalImported} مورد از شبکه اجتماعی وارد شد`);
     }
   };
 
@@ -162,35 +183,29 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
           />
         </div>
 
-        {/* Social Media Import Button - Per Product Description */}
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-          <div className="text-center">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              واردکردن از شبکه‌های اجتماعی
-            </h3>
-            <p className="text-gray-600 mb-4">
-              5 پست آخر از تلگرام یا اینستاگرام را دریافت کنید
-            </p>
-            <div className="flex justify-center space-x-4 space-x-reverse">
-              <button
-                type="button"
-                onClick={() => handleSocialMediaImport('telegram')}
-                className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-              >
-                <Send className="w-4 h-4 ml-2" />
-                دریافت از تلگرام
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSocialMediaImport('instagram')}
-                className="flex items-center px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
-              >
-                <Instagram className="w-4 h-4 ml-2" />
-                دریافت از اینستاگرام
-              </button>
+        {/* Social Media Import - Per Product Description Requirement */}
+        <SocialMediaImport 
+          onImport={handleSocialMediaImport}
+          className="mb-6"
+        />
+
+        {/* Show imported social media data */}
+        {socialMediaData && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <h4 className="font-medium text-green-800 mb-2">محتوای وارد شده از شبکه اجتماعی:</h4>
+            <div className="text-sm text-green-700 space-y-1">
+              {socialMediaData.selectedTexts?.length > 0 && (
+                <div>• {socialMediaData.selectedTexts.length} متن</div>
+              )}
+              {socialMediaData.selectedImages?.length > 0 && (
+                <div>• {socialMediaData.selectedImages.length} تصویر</div>
+              )}
+              {socialMediaData.selectedVideos?.length > 0 && (
+                <div>• {socialMediaData.selectedVideos.length} ویدیو</div>
+              )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Product Attributes */}
         {productClass.attributes && productClass.attributes.length > 0 && (
@@ -300,7 +315,7 @@ export const useProductInstanceForm = () => {
   const submitProduct = async (data: any, createAnother: boolean) => {
     setLoading(true);
     try {
-      // API call to create product instance
+      // API call to create product instance with social media data
       const response = await fetch('/api/products/', {
         method: 'POST',
         headers: {
