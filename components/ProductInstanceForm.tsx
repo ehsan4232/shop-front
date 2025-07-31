@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { ColorPicker } from './ui/ColorPicker';
+import ColorPicker from './ui/ColorPicker';
 import SocialMediaImport from './SocialMediaImport';
+import apiClient from '@/lib/api';
 
 interface ProductInstanceFormProps {
   productClass: any;
@@ -15,37 +16,45 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
   const [createAnother, setCreateAnother] = useState(false);
   const [attributes, setAttributes] = useState<{[key: string]: any}>({});
   const [socialMediaData, setSocialMediaData] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
 
-  const handleFormSubmit = (data: any) => {
-    // Merge form data with attributes and social media data
-    const completeData = {
-      ...data,
-      attributes,
-      social_media_data: socialMediaData
-    };
-    
-    onSubmit(completeData, createAnother);
-    
-    // If creating another instance, reset form but keep some values
-    if (createAnother) {
-      const preservedValues = {
-        product_class: data.product_class,
-        category: data.category,
-        brand: data.brand,
-        // Keep other common fields
+  const handleFormSubmit = async (data: any) => {
+    setIsSubmitting(true);
+    try {
+      // Merge form data with attributes and social media data
+      const completeData = {
+        ...data,
+        attributes,
+        social_media_data: socialMediaData
       };
-      reset(preservedValues);
-      // Keep non-instance-specific attributes
-      const preservedAttributes = {};
-      Object.keys(attributes).forEach(key => {
-        const attr = productClass.attributes?.find(a => a.id.toString() === key);
-        if (attr && !attr.is_instance_specific) {
-          preservedAttributes[key] = attributes[key];
-        }
-      });
-      setAttributes(preservedAttributes);
-      setSocialMediaData(null);
+      
+      await onSubmit(completeData, createAnother);
+      
+      // If creating another instance, reset form but keep some values
+      if (createAnother) {
+        const preservedValues = {
+          product_class: data.product_class,
+          category: data.category,
+          brand: data.brand,
+          // Keep other common fields
+        };
+        reset(preservedValues);
+        // Keep non-instance-specific attributes
+        const preservedAttributes = {};
+        Object.keys(attributes).forEach(key => {
+          const attr = productClass.attributes?.find(a => a.id.toString() === key);
+          if (attr && !attr.is_instance_specific) {
+            preservedAttributes[key] = attributes[key];
+          }
+        });
+        setAttributes(preservedAttributes);
+        setSocialMediaData(null);
+      }
+    } catch (error) {
+      console.error('خطا در ایجاد محصول:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -85,7 +94,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow">
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow" dir="rtl">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">
           ایجاد محصول جدید
@@ -105,7 +114,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
             <input
               type="text"
               {...register('name_fa', { required: 'نام فارسی الزامی است' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-right"
             />
             {errors.name_fa && (
               <p className="text-red-500 text-sm mt-1">{errors.name_fa.message}</p>
@@ -119,7 +128,8 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
             <input
               type="text"
               {...register('name')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-left"
+              dir="ltr"
             />
           </div>
         </div>
@@ -134,7 +144,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
               type="number"
               {...register('base_price')}
               placeholder={`قیمت وراثتی: ${productClass.effective_price || 0}`}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-right"
             />
             <p className="text-xs text-gray-500 mt-1">
               در صورت خالی ماندن، قیمت از کلاس والد به ارث می‌رسد
@@ -148,7 +158,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
             <input
               type="number"
               {...register('compare_price')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-right"
             />
           </div>
 
@@ -162,7 +172,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
                 required: 'موجودی انبار الزامی است',
                 min: { value: 0, message: 'موجودی نمی‌تواند منفی باشد' }
               })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-right"
             />
             {errors.stock_quantity && (
               <p className="text-red-500 text-sm mt-1">{errors.stock_quantity.message}</p>
@@ -178,7 +188,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
           <textarea
             {...register('description')}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-right"
             placeholder="توضیحات کاملی از محصول بنویسید..."
           />
         </div>
@@ -214,7 +224,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
             {productClass.attributes.map((attr) => (
               <div key={attr.id} className="space-y-2">
                 {attr.data_type === 'color' ? (
-                  // ENHANCED: Use ColorPicker component for color attributes
+                  // Use ColorPicker component for color attributes
                   <ColorPicker
                     label={attr.name_fa + (attr.is_required ? ' *' : '')}
                     value={attributes[attr.id] || attr.default_value || '#000000'}
@@ -231,7 +241,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
                       value={attributes[attr.id] || ''}
                       onChange={(e) => handleAttributeChange(attr.id, e.target.value)}
                       placeholder={attr.default_value}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-right"
                       required={attr.is_required}
                     />
                   </div>
@@ -259,7 +269,7 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
                       value={attributes[attr.id] || ''}
                       onChange={(e) => handleAttributeChange(attr.id, e.target.value)}
                       placeholder={attr.default_value}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-right"
                       required={attr.is_required}
                     />
                   </div>
@@ -293,14 +303,23 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
           <button
             type="button"
             className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            disabled={isSubmitting}
           >
             انصراف
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSubmitting}
           >
-            {createAnother ? 'ذخیره و ایجاد بعدی' : 'ذخیره محصول'}
+            {isSubmitting ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                در حال ذخیره...
+              </div>
+            ) : (
+              createAnother ? 'ذخیره و ایجاد بعدی' : 'ذخیره محصول'
+            )}
           </button>
         </div>
       </form>
@@ -308,33 +327,27 @@ export const ProductInstanceForm: React.FC<ProductInstanceFormProps> = ({
   );
 };
 
-// Hook for handling form submission
+// Hook for handling form submission with proper API integration
 export const useProductInstanceForm = () => {
   const [loading, setLoading] = useState(false);
 
   const submitProduct = async (data: any, createAnother: boolean) => {
     setLoading(true);
     try {
-      // API call to create product instance with social media data
-      const response = await fetch('/api/products/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (response.ok) {
-        if (createAnother) {
-          // Show success message but stay on form
-          console.log('محصول ایجاد شد. آماده برای محصول بعدی');
-        } else {
-          // Redirect to product list or detail
-          console.log('محصول با موفقیت ایجاد شد');
-        }
+      const response = await apiClient.createProduct(data);
+      
+      if (createAnother) {
+        // Show success message but stay on form
+        console.log('محصول ایجاد شد. آماده برای محصول بعدی');
+      } else {
+        // Redirect to product list or detail
+        console.log('محصول با موفقیت ایجاد شد');
       }
+      
+      return response;
     } catch (error) {
       console.error('خطا در ایجاد محصول:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
