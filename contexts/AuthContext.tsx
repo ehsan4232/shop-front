@@ -1,127 +1,72 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import apiClient from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  isActive: boolean;
-  dateJoined: string;
+  phone_number: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  is_store_owner: boolean;
+  is_phone_verified: boolean;
   profile?: {
-    phone?: string;
-    dateOfBirth?: string;
-    gender?: string;
-    address?: string;
+    avatar?: string;
+    bio?: string;
     city?: string;
     state?: string;
-    zipCode?: string;
-    country?: string;
-    bio?: string;
   };
-}
-
-interface Tenant {
-  id: string;
-  name: string;
-  domain: string;
 }
 
 interface AuthState {
   user: User | null;
-  tenant: Tenant | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
 }
 
-type AuthAction =
-  | { type: 'LOGIN_START' }
-  | { type: 'LOGIN_SUCCESS'; payload: { user: User; tenant?: Tenant } }
-  | { type: 'LOGIN_FAILURE'; payload: string }
-  | { type: 'LOGOUT' }
-  | { type: 'UPDATE_USER'; payload: User }
-  | { type: 'CLEAR_ERROR' }
-  | { type: 'SET_LOADING'; payload: boolean };
-
-const AuthContext = createContext<{
+interface AuthContextType {
   state: AuthState;
-  dispatch: React.Dispatch<AuthAction>;
-  login: (email: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  login: (phoneNumber: string, otpCode: string, userType?: 'login' | 'register', userData?: any) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (profileData: Partial<User>) => Promise<void>;
-  refreshToken: () => Promise<boolean>;
-} | null>(null);
-
-interface RegisterData {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  tenantDomain?: string;
+  sendOTP: (phoneNumber: string, type?: 'login' | 'register') => Promise<any>;
+  resendOTP: (phoneNumber: string, type?: 'login' | 'register') => Promise<any>;
+  checkPhone: (phoneNumber: string) => Promise<boolean>;
+  updateProfile: (userData: Partial<User>) => Promise<void>;
+  clearError: () => void;
 }
+
+type AuthAction =
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_USER'; payload: User | null }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'LOGOUT' };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   switch (action.type) {
-    case 'LOGIN_START':
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      };
-
-    case 'LOGIN_SUCCESS':
-      return {
-        ...state,
-        user: action.payload.user,
-        tenant: action.payload.tenant || null,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      };
-
-    case 'LOGIN_FAILURE':
-      return {
-        ...state,
-        user: null,
-        tenant: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: action.payload,
-      };
-
-    case 'LOGOUT':
-      return {
-        ...state,
-        user: null,
-        tenant: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      };
-
-    case 'UPDATE_USER':
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+    case 'SET_USER':
       return {
         ...state,
         user: action.payload,
-      };
-
-    case 'CLEAR_ERROR':
-      return {
-        ...state,
+        isAuthenticated: !!action.payload,
+        isLoading: false,
         error: null,
       };
-
-    case 'SET_LOADING':
+    case 'SET_ERROR':
+      return { ...state, error: action.payload, isLoading: false };
+    case 'CLEAR_ERROR':
+      return { ...state, error: null };
+    case 'LOGOUT':
       return {
-        ...state,
-        isLoading: action.payload,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
       };
-
     default:
       return state;
   }
@@ -129,227 +74,258 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 
 const initialState: AuthState = {
   user: null,
-  tenant: null,
   isAuthenticated: false,
   isLoading: true,
   error: null,
 };
 
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// API client for authentication
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+const apiClient = {
+  async post(url: string, data: any) {
+    const token = localStorage.getItem('auth-token');
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || result.message || 'خطای ناشناخته');
+    }
+
+    return result;
+  },
+
+  async get(url: string) {
+    const token = localStorage.getItem('auth-token');
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Token expired, try to refresh
+        await this.refreshToken();
+        // Retry the request
+        return this.get(url);
+      }
+      throw new Error('خطا در دریافت اطلاعات');
+    }
+
+    return response.json();
+  },
+
+  async refreshToken() {
+    const refreshToken = localStorage.getItem('refresh-token');
+    if (!refreshToken) {
+      throw new Error('Refresh token not found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/refresh/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+
+    if (!response.ok) {
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('refresh-token');
+      throw new Error('Token refresh failed');
+    }
+
+    const data = await response.json();
+    localStorage.setItem('auth-token', data.access);
+    return data;
+  },
+
+  setToken(token: string) {
+    localStorage.setItem('auth-token', token);
+  },
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const router = useRouter();
 
   // Check for existing session on mount
   useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = async () => {
-    try {
+    const checkAuth = async () => {
       const token = localStorage.getItem('auth-token');
       if (!token) {
         dispatch({ type: 'SET_LOADING', payload: false });
         return;
       }
 
-      // Set token in API client
-      apiClient.setToken(token);
+      try {
+        const userData = await apiClient.get('/profile/');
+        dispatch({ type: 'SET_USER', payload: userData });
+      } catch (error) {
+        // Token is invalid, clear it
+        localStorage.removeItem('auth-token');
+        localStorage.removeItem('refresh-token');
+        dispatch({ type: 'LOGOUT' });
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    };
 
-      // Verify token and get user info
-      const response = await apiClient.get<{ user: User; profile?: any }>('/auth/profile/');
+    checkAuth();
+  }, []);
+
+  const sendOTP = async (phoneNumber: string, type: 'login' | 'register' = 'login') => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'CLEAR_ERROR' });
+
+    try {
+      const response = await apiClient.post('/send-otp/', {
+        phone_number: phoneNumber,
+        code_type: type,
+      });
       
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: {
-          user: { ...response.user, profile: response.profile },
-        },
-      });
-    } catch (error) {
-      // Token is invalid, clear it
-      localStorage.removeItem('auth-token');
-      localStorage.removeItem('refresh-token');
-      apiClient.setToken(null);
-      dispatch({ type: 'LOGOUT' });
-    } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  };
-
-  const login = async (email: string, password: string): Promise<void> => {
-    dispatch({ type: 'LOGIN_START' });
-
-    try {
-      const response = await apiClient.post<{
-        access: string;
-        refresh: string;
-        user: User;
-        tenant?: Tenant;
-      }>('/auth/login/', { email, password });
-
-      // Store tokens
-      localStorage.setItem('auth-token', response.access);
-      localStorage.setItem('refresh-token', response.refresh);
-
-      // Set token in API client
-      apiClient.setToken(response.access);
-
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: {
-          user: response.user,
-          tenant: response.tenant,
-        },
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
-      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
+      return response;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
       throw error;
     }
   };
 
-  const register = async (userData: RegisterData): Promise<void> => {
-    dispatch({ type: 'LOGIN_START' });
+  const resendOTP = async (phoneNumber: string, type: 'login' | 'register' = 'login') => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'CLEAR_ERROR' });
 
     try {
-      const response = await apiClient.post<{
-        access: string;
-        refresh: string;
-        user: User;
-        tenant?: Tenant;
-      }>('/auth/register/', {
-        email: userData.email,
-        password: userData.password,
-        first_name: userData.firstName,
-        last_name: userData.lastName,
-        phone: userData.phone,
-        tenant_domain: userData.tenantDomain,
+      const response = await apiClient.post('/resend-otp/', {
+        phone_number: phoneNumber,
+        code_type: type,
       });
-
-      // Store tokens
-      localStorage.setItem('auth-token', response.access);
-      localStorage.setItem('refresh-token', response.refresh);
-
-      // Set token in API client
-      apiClient.setToken(response.access);
-
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: {
-          user: response.user,
-          tenant: response.tenant,
-        },
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Registration failed';
-      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
+      
+      dispatch({ type: 'SET_LOADING', payload: false });
+      return response;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
       throw error;
     }
   };
 
-  const logout = async (): Promise<void> => {
+  const login = async (
+    phoneNumber: string,
+    otpCode: string,
+    userType: 'login' | 'register' = 'login',
+    userData?: any
+  ) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'CLEAR_ERROR' });
+
     try {
-      const refreshToken = localStorage.getItem('refresh-token');
-      if (refreshToken) {
-        await apiClient.post('/auth/logout/', { refresh_token: refreshToken });
+      const requestData: any = {
+        phone_number: phoneNumber,
+        code: otpCode,
+        code_type: userType,
+      };
+
+      if (userType === 'register' && userData) {
+        requestData.user_data = userData;
       }
-    } catch (error) {
-      // Even if logout fails on server, clear local data
-      console.error('Logout error:', error);
+
+      const response = await apiClient.post('/verify-otp/', requestData);
+
+      // Store tokens
+      localStorage.setItem('auth-token', response.access);
+      localStorage.setItem('refresh-token', response.refresh);
+      apiClient.setToken(response.access);
+
+      // Set user
+      dispatch({ type: 'SET_USER', payload: response.user });
+
+      return response;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      // Try to logout on server (optional, fire and forget)
+      const token = localStorage.getItem('auth-token');
+      if (token) {
+        try {
+          await apiClient.post('/auth/logout/', {});
+        } catch (error) {
+          // Ignore logout errors
+        }
+      }
     } finally {
-      // Clear local storage
+      // Always clear local storage and state
       localStorage.removeItem('auth-token');
       localStorage.removeItem('refresh-token');
-
-      // Clear API client token
-      apiClient.setToken(null);
-
-      // Update state
       dispatch({ type: 'LOGOUT' });
     }
   };
 
-  const updateProfile = async (profileData: Partial<User>): Promise<void> => {
+  const checkPhone = async (phoneNumber: string): Promise<boolean> => {
     try {
-      const response = await apiClient.put<{
-        user: User;
-        profile?: any;
-      }>('/auth/profile/', profileData);
-
-      dispatch({
-        type: 'UPDATE_USER',
-        payload: { ...response.user, profile: response.profile },
+      const response = await apiClient.post('/check-phone/', {
+        phone_number: phoneNumber,
       });
+      return response.exists;
     } catch (error) {
-      throw error;
-    }
-  };
-
-  const refreshToken = async (): Promise<boolean> => {
-    try {
-      const refreshTokenValue = localStorage.getItem('refresh-token');
-      if (!refreshTokenValue) {
-        return false;
-      }
-
-      const response = await apiClient.post<{
-        access: string;
-      }>('/auth/token/refresh/', { refresh: refreshTokenValue });
-
-      localStorage.setItem('auth-token', response.access);
-      apiClient.setToken(response.access);
-
-      return true;
-    } catch (error) {
-      // Refresh failed, logout user
-      await logout();
       return false;
     }
   };
 
-  // Auto-refresh token before it expires
-  useEffect(() => {
-    if (!state.isAuthenticated) return;
+  const updateProfile = async (userData: Partial<User>) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'CLEAR_ERROR' });
 
-    const interval = setInterval(async () => {
-      await refreshToken();
-    }, 14 * 60 * 1000); // Refresh every 14 minutes (assuming 15-minute access token)
+    try {
+      const response = await apiClient.post('/profile/update/', userData);
+      dispatch({ type: 'SET_USER', payload: response.user });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
 
-    return () => clearInterval(interval);
-  }, [state.isAuthenticated]);
+  const clearError = () => {
+    dispatch({ type: 'CLEAR_ERROR' });
+  };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        state,
-        dispatch,
-        login,
-        register,
-        logout,
-        updateProfile,
-        refreshToken,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const value: AuthContextType = {
+    state,
+    login,
+    logout,
+    sendOTP,
+    resendOTP,
+    checkPhone,
+    updateProfile,
+    clearError,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
-// Helper functions
-export const isAuthenticated = (state: AuthState): boolean => {
-  return state.isAuthenticated && state.user !== null;
-};
-
-export const getUser = (state: AuthState): User | null => {
-  return state.user;
-};
-
-export const getTenant = (state: AuthState): Tenant | null => {
-  return state.tenant;
-};
+export default AuthContext;
