@@ -3,30 +3,33 @@ import { ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import apiClient from '@/lib/api';
 
-interface Theme {
+interface StoreTheme {
   id: string;
   name_fa: string;
   description: string;
-  theme_type: string;
+  category: string;
   layout_type: string;
   color_scheme: string;
   preview_image: string;
-  thumbnail: string;
+  preview_images: string[];
   demo_url: string;
   is_premium: boolean;
   price: number;
-  usage_count: number;
+  install_count: number;
   rating_average: number;
   rating_count: number;
-  suggested_for_types: string[];
+  features: string[];
+  primary_color: string;
+  secondary_color: string;
+  accent_color: string;
 }
 
 interface ThemePreviewProps {
-  theme: Theme;
+  theme: StoreTheme;
   isSelected: boolean;
-  onSelect: (theme: Theme) => void;
-  onPreview: (theme: Theme) => void;
-  onApply: (theme: Theme) => void;
+  onSelect: (theme: StoreTheme) => void;
+  onPreview: (theme: StoreTheme) => void;
+  onApply: (theme: StoreTheme) => void;
   isApplying?: boolean;
 }
 
@@ -95,13 +98,32 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({
             <span>{theme.rating_average.toFixed(1)}</span>
             <span className="mr-1">({theme.rating_count})</span>
           </div>
-          <span>{theme.usage_count} استفاده</span>
+          <span>{theme.install_count} نصب</span>
+        </div>
+
+        {/* Color Scheme Preview */}
+        <div className="flex items-center mb-3">
+          <div className="flex ml-2">
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-200"
+              style={{ backgroundColor: theme.primary_color }}
+            />
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-200 -mr-1"
+              style={{ backgroundColor: theme.secondary_color }}
+            />
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-200 -mr-1"
+              style={{ backgroundColor: theme.accent_color }}
+            />
+          </div>
+          <span className="text-xs text-gray-500">طرح رنگی</span>
         </div>
 
         {/* Theme Type Tags */}
         <div className="flex flex-wrap gap-1 mb-3">
           <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-            {theme.theme_type}
+            {theme.category}
           </span>
           <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
             {theme.layout_type}
@@ -110,6 +132,23 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({
             {theme.color_scheme}
           </span>
         </div>
+
+        {/* Features */}
+        {theme.features && theme.features.length > 0 && (
+          <div className="mb-3">
+            <p className="text-xs text-gray-500 mb-1">امکانات:</p>
+            <div className="flex flex-wrap gap-1">
+              {theme.features.slice(0, 3).map((feature, index) => (
+                <span key={index} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                  {feature}
+                </span>
+              ))}
+              {theme.features.length > 3 && (
+                <span className="text-xs text-gray-400">+{theme.features.length - 3}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-2">
@@ -138,7 +177,7 @@ interface ThemeSelectorProps {
   storeId: string;
   currentThemeId?: string;
   businessType?: string;
-  onThemeApplied: (theme: Theme) => void;
+  onThemeApplied: (theme: StoreTheme) => void;
 }
 
 const ThemeSelector: React.FC<ThemeSelectorProps> = ({
@@ -147,14 +186,14 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
   businessType,
   onThemeApplied
 }) => {
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [filteredThemes, setFilteredThemes] = useState<Theme[]>([]);
+  const [themes, setThemes] = useState<StoreTheme[]>([]);
+  const [filteredThemes, setFilteredThemes] = useState<StoreTheme[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<StoreTheme | null>(null);
   const [applyingTheme, setApplyingTheme] = useState<string | null>(null);
   
   // Filters
-  const [filterType, setFilterType] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterLayout, setFilterLayout] = useState<string>('all');
   const [filterPremium, setFilterPremium] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('popular');
@@ -165,12 +204,13 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
 
   useEffect(() => {
     applyFilters();
-  }, [themes, filterType, filterLayout, filterPremium, sortBy, businessType]);
+  }, [themes, filterCategory, filterLayout, filterPremium, sortBy, businessType]);
 
   const loadThemes = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/themes/');
+      // Use the stores app themes endpoint
+      const response = await apiClient.get('/stores/themes/');
       setThemes(response.data.results || response.data);
     } catch (error) {
       console.error('خطا در دریافت قالب‌ها:', error);
@@ -182,9 +222,9 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
   const applyFilters = () => {
     let filtered = [...themes];
 
-    // Filter by type
-    if (filterType !== 'all') {
-      filtered = filtered.filter(theme => theme.theme_type === filterType);
+    // Filter by category
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter(theme => theme.category === filterCategory);
     }
 
     // Filter by layout
@@ -199,14 +239,10 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
       filtered = filtered.filter(theme => theme.is_premium);
     }
 
-    // Business type suggestions
+    // Business type suggestions (move suggested themes to top)
     if (businessType) {
-      const suggested = filtered.filter(theme => 
-        theme.suggested_for_types.includes(businessType)
-      );
-      const others = filtered.filter(theme => 
-        !theme.suggested_for_types.includes(businessType)
-      );
+      const suggested = filtered.filter(theme => theme.category === businessType);
+      const others = filtered.filter(theme => theme.category !== businessType);
       filtered = [...suggested, ...others];
     }
 
@@ -214,7 +250,7 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'popular':
-          return b.usage_count - a.usage_count;
+          return b.install_count - a.install_count;
         case 'rating':
           return b.rating_average - a.rating_average;
         case 'newest':
@@ -231,23 +267,28 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
     setFilteredThemes(filtered);
   };
 
-  const handleThemeSelect = (theme: Theme) => {
+  const handleThemeSelect = (theme: StoreTheme) => {
     setSelectedTheme(theme);
   };
 
-  const handleThemePreview = (theme: Theme) => {
+  const handleThemePreview = (theme: StoreTheme) => {
     if (theme.demo_url) {
       window.open(theme.demo_url, '_blank');
     }
   };
 
-  const handleThemeApply = async (theme: Theme) => {
+  const handleThemeApply = async (theme: StoreTheme) => {
     try {
       setApplyingTheme(theme.id);
       
+      // Use the stores app apply-theme endpoint
       const response = await apiClient.post(`/stores/${storeId}/apply-theme/`, {
         theme_id: theme.id,
-        custom_options: {} // Could include customization options
+        custom_colors: {
+          primary: theme.primary_color,
+          secondary: theme.secondary_color,
+          accent: theme.accent_color
+        }
       });
 
       onThemeApplied(theme);
@@ -297,20 +338,21 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
       <div className="bg-gray-50 p-4 rounded-lg">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">نوع قالب</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">دسته‌بندی</label>
             <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded text-sm"
             >
               <option value="all">همه</option>
-              <option value="minimal">مینیمال</option>
-              <option value="modern">مدرن</option>
-              <option value="classic">کلاسیک</option>
-              <option value="elegant">شیک</option>
-              <option value="bold">پررنگ</option>
-              <option value="business">تجاری</option>
-              <option value="creative">خلاقانه</option>
+              <option value="fashion">پوشاک و مد</option>
+              <option value="electronics">الکترونیک</option>
+              <option value="jewelry">جواهرات</option>
+              <option value="home_garden">خانه و باغ</option>
+              <option value="beauty">زیبایی و سلامت</option>
+              <option value="sports">ورزشی</option>
+              <option value="food">غذا و نوشیدنی</option>
+              <option value="general">عمومی</option>
             </select>
           </div>
 
@@ -325,8 +367,9 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
               <option value="grid">شبکه‌ای</option>
               <option value="list">لیستی</option>
               <option value="masonry">آجری</option>
-              <option value="carousel">کاروسل</option>
+              <option value="carousel">کروسل</option>
               <option value="magazine">مجله‌ای</option>
+              <option value="minimal">مینیمال</option>
             </select>
           </div>
 
@@ -361,7 +404,7 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
           <div className="flex items-end">
             <button
               onClick={() => {
-                setFilterType('all');
+                setFilterCategory('all');
                 setFilterLayout('all');
                 setFilterPremium('all');
                 setSortBy('popular');
